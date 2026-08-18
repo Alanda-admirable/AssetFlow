@@ -3,8 +3,14 @@ import type { Asset } from "./types";
 
 export const statusLabels: Record<string, string> = {
   active: "พร้อมใช้งาน",
+  available: "พร้อมใช้งาน",
   in_use: "กำลังใช้งาน",
+  assigned: "มีผู้รับผิดชอบ",
+  borrowed: "ถูกยืมใช้งาน",
   in_repair: "ส่งซ่อม",
+  maintenance: "อยู่ระหว่างซ่อม",
+  damaged: "ชำรุด",
+  disposed: "จำหน่ายแล้ว",
   written_off: "จำหน่ายแล้ว",
   pending_approval: "รออนุมัติ",
   approved: "อนุมัติแล้ว",
@@ -20,7 +26,7 @@ export const statusLabels: Record<string, string> = {
 };
 
 /**
- * ส่งออกข้อมูลครุภัณฑ์เป็นไฟล์ Excel (.xlsx) พร้อมฝังรูปภาพลงในแต่ละแถว
+ * ส่งออกข้อมูลครุภัณฑ์เป็นไฟล์ Excel (.xlsx) พร้อมฝังรูปภาพขนาดใหญ่และคมชัดลงในแต่ละแถว
  */
 export async function exportAssetsToExcel(
   rows: Asset[],
@@ -43,10 +49,10 @@ export async function exportAssetsToExcel(
     },
   });
 
-  // กำหนดคอลัมน์
+  // กำหนดคอลัมน์ (ขยายคอลัมน์รูปภาพเป็น 28 ให้เห็นรูปใหญ่ชัดเจน)
   worksheet.columns = [
     { header: "ลำดับ", key: "index", width: 8 },
-    { header: "รูปภาพ", key: "image", width: 18 },
+    { header: "รูปภาพครุภัณฑ์", key: "image", width: 28 },
     { header: "รหัสครุภัณฑ์", key: "assetCode", width: 20 },
     { header: "ชื่อรายการครุภัณฑ์", key: "name", width: 35 },
     { header: "หมวดหมู่", key: "category", width: 18 },
@@ -59,7 +65,7 @@ export async function exportAssetsToExcel(
 
   // สไตล์แถวหัวตาราง (Header Row)
   const headerRow = worksheet.getRow(1);
-  headerRow.height = 32;
+  headerRow.height = 36;
   headerRow.eachCell((cell) => {
     cell.fill = {
       type: "pattern",
@@ -101,10 +107,10 @@ export async function exportAssetsToExcel(
       building: r.building || "-",
     });
 
-    row.height = 68; // ความสูงแถวให้พอดีกับ Thumbnail รูปภาพ
+    row.height = 100; // ปรับความสูงแถวเป็น 100px ให้ภาพขนาดใหญ่ คมชัด สบายตา
 
     // จัดตำแหน่งและฟอร์แมตเซลล์
-    row.eachCell((cell, colNumber) => {
+    row.eachCell((cell) => {
       cell.alignment = { vertical: "middle" };
       cell.font = { name: "Segoe UI", size: 10 };
       cell.border = {
@@ -132,7 +138,7 @@ export async function exportAssetsToExcel(
     row.getCell("status").alignment = { vertical: "middle", horizontal: "center" };
     row.getCell("acquisitionDate").alignment = { vertical: "middle", horizontal: "center" };
 
-    // แทรกรูปภาพลงในเซลล์คอลัมน์ "รูปภาพ" (Column B)
+    // แทรกรูปภาพลงในเซลล์คอลัมน์ "รูปภาพครุภัณฑ์" (Column B) ขนาดใหญ่ คมชัด
     if (r.imageUrl) {
       try {
         const res = await fetch(r.imageUrl);
@@ -145,9 +151,10 @@ export async function exportAssetsToExcel(
             extension: ext,
           });
 
+          // วางรูปภาพให้เต็มและสมดุลภายในช่องเซลล์ B
           worksheet.addImage(imageId, {
-            tl: { col: 1.15, row: rowIndex - 1 + 0.08 } as any,
-            br: { col: 1.85, row: rowIndex - 0.08 } as any,
+            tl: { col: 1.05, row: rowIndex - 1 + 0.05 } as any,
+            br: { col: 1.95, row: rowIndex - 0.05 } as any,
             editAs: "oneCell",
           });
         }
