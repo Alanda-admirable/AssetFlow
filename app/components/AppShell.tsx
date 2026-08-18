@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { ChangeEvent, FormEvent, Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { canAccessSection, navigationForRole, sectionTitles } from "../lib/navigation";
 import type { Asset, BootstrapData, RequestRow } from "../lib/types";
+import { exportAssetsToExcel } from "../lib/excelExport";
 
 type ModalName = "asset" | "request" | "transfer" | "maintenance" | "document" | null;
 
@@ -641,6 +642,23 @@ function VisualCatalog({
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
   const [customPrintAssets, setCustomPrintAssets] = useState<Asset[] | null>(null);
+  const [isExportingExcel, setIsExportingExcel] = useState<boolean>(false);
+  const [exportProgress, setExportProgress] = useState<{ current: number; total: number } | null>(null);
+
+  async function handleExportExcel() {
+    try {
+      setIsExportingExcel(true);
+      await exportAssetsToExcel(displayedAssets as any, (current, total) => {
+        setExportProgress({ current, total });
+      });
+    } catch (err) {
+      console.error("Export Excel error:", err);
+      alert("เกิดข้อผิดพลาดในการสร้างไฟล์ Excel");
+    } finally {
+      setIsExportingExcel(false);
+      setExportProgress(null);
+    }
+  }
 
   const categories = useMemo(() => {
     const set = new Set<string>();
@@ -739,14 +757,32 @@ function VisualCatalog({
           ))}
         </div>
 
-        <div className="catalog-actions" style={{ display: "flex", gap: "8px" }}>
+        <div className="catalog-actions" style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           {canManage && (
             <button className="button primary" onClick={() => helpers.setModal("asset")}>
               + เพิ่มข้อมูลครุภัณฑ์
             </button>
           )}
-          <button className="button ghost" onClick={() => exportAssets(displayedAssets)}>
-            ส่งออก CSV
+          <button
+            className="button ghost"
+            onClick={handleExportExcel}
+            disabled={isExportingExcel}
+            title="ส่งออกทะเบียนครุภัณฑ์เป็นไฟล์ Excel พร้อมแทรกรูปภาพจริง"
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontWeight: 600 }}
+          >
+            {isExportingExcel ? (
+              <span>⏳ กำลังสร้าง Excel ({exportProgress ? `${exportProgress.current}/${exportProgress.total}` : "..."})</span>
+            ) : (
+              <span>📊 ส่งออก Excel (พร้อมรูปภาพ)</span>
+            )}
+          </button>
+          <button
+            className="button ghost"
+            onClick={() => exportAssets(displayedAssets)}
+            title="ส่งออกเฉพาะข้อความแบบ CSV"
+            style={{ padding: "8px 10px", fontSize: "12px", opacity: 0.75 }}
+          >
+            CSV
           </button>
           <button className="button primary" onClick={() => setIsPrintModalOpen(true)}>
             🖨️ พิมพ์ใบตรวจนับ
