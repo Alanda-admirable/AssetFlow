@@ -26,7 +26,7 @@ export const statusLabels: Record<string, string> = {
 };
 
 /**
- * ส่งออกข้อมูลครุภัณฑ์เป็นไฟล์ Excel (.xlsx) พร้อมฝังรูปภาพขนาดใหญ่และคมชัดลงในแต่ละแถว
+ * ส่งออกข้อมูลครุภัณฑ์เป็นไฟล์ Excel (.xlsx) พร้อมฝังรูปภาพขนาดใหญ่พิเศษ (High-Resolution Inspection Size)
  */
 export async function exportAssetsToExcel(
   rows: Asset[],
@@ -49,11 +49,11 @@ export async function exportAssetsToExcel(
     },
   });
 
-  // กำหนดคอลัมน์ (ขยายคอลัมน์รูปภาพเป็น 28 ให้เห็นรูปใหญ่ชัดเจน)
+  // กำหนดคอลัมน์ (ขยายคอลัมน์รูปภาพเป็น 46 กว้าง ~350px ให้เห็นรายละเอียดสิ่งของชัดเจน)
   worksheet.columns = [
     { header: "ลำดับ", key: "index", width: 8 },
-    { header: "รูปภาพครุภัณฑ์", key: "image", width: 28 },
-    { header: "รหัสครุภัณฑ์", key: "assetCode", width: 20 },
+    { header: "รูปภาพครุภัณฑ์ (ภาพขยายตรวจนับ)", key: "image", width: 46 },
+    { header: "รหัสครุภัณฑ์", key: "assetCode", width: 22 },
     { header: "ชื่อรายการครุภัณฑ์", key: "name", width: 35 },
     { header: "หมวดหมู่", key: "category", width: 18 },
     { header: "สถานที่จัดเก็บ", key: "location", width: 28 },
@@ -65,7 +65,7 @@ export async function exportAssetsToExcel(
 
   // สไตล์แถวหัวตาราง (Header Row)
   const headerRow = worksheet.getRow(1);
-  headerRow.height = 36;
+  headerRow.height = 38;
   headerRow.eachCell((cell) => {
     cell.fill = {
       type: "pattern",
@@ -78,7 +78,7 @@ export async function exportAssetsToExcel(
       bold: true,
       color: { argb: "FFFFFFFF" },
     };
-    cell.alignment = { vertical: "middle", horizontal: "center" };
+    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
     cell.border = {
       top: { style: "thin", color: { argb: "FF334155" } },
       left: { style: "thin", color: { argb: "FF334155" } },
@@ -107,11 +107,12 @@ export async function exportAssetsToExcel(
       building: r.building || "-",
     });
 
-    row.height = 100; // ปรับความสูงแถวเป็น 100px ให้ภาพขนาดใหญ่ คมชัด สบายตา
+    // ความสูงแถว 165px (~220 screen pixels) ให้เห็นภาพใหญ่เต็มตา ชัดเจนทุกรายละเอียด
+    row.height = 165;
 
     // จัดตำแหน่งและฟอร์แมตเซลล์
     row.eachCell((cell) => {
-      cell.alignment = { vertical: "middle" };
+      cell.alignment = { vertical: "middle", wrapText: true };
       cell.font = { name: "Segoe UI", size: 10 };
       cell.border = {
         top: { style: "thin", color: { argb: "FFE2E8F0" } },
@@ -132,13 +133,13 @@ export async function exportAssetsToExcel(
 
     row.getCell("index").alignment = { vertical: "middle", horizontal: "center" };
     row.getCell("assetCode").alignment = { vertical: "middle", horizontal: "center" };
-    row.getCell("assetCode").font = { name: "Segoe UI", size: 10, bold: true };
+    row.getCell("assetCode").font = { name: "Segoe UI", size: 11, bold: true };
     row.getCell("purchasePrice").numFmt = "#,##0.00";
     row.getCell("purchasePrice").alignment = { vertical: "middle", horizontal: "right" };
     row.getCell("status").alignment = { vertical: "middle", horizontal: "center" };
     row.getCell("acquisitionDate").alignment = { vertical: "middle", horizontal: "center" };
 
-    // แทรกรูปภาพลงในเซลล์คอลัมน์ "รูปภาพครุภัณฑ์" (Column B) ขนาดใหญ่ คมชัด
+    // แทรกรูปภาพขนาดใหญ่พิเศษ (310 x 205 px) คมชัดเต็มช่องเซลล์
     if (r.imageUrl) {
       try {
         const res = await fetch(r.imageUrl);
@@ -151,10 +152,10 @@ export async function exportAssetsToExcel(
             extension: ext,
           });
 
-          // วางรูปภาพให้เต็มและสมดุลภายในช่องเซลล์ B
+          // วางรูปภาพด้วยขนาดคงที่ 310 x 205 px เพื่อความคมชัดสูงสุด
           worksheet.addImage(imageId, {
-            tl: { col: 1.05, row: rowIndex - 1 + 0.05 } as any,
-            br: { col: 1.95, row: rowIndex - 0.05 } as any,
+            tl: { col: 1.05, row: rowIndex - 1 + 0.03 } as any,
+            ext: { width: 310, height: 205 },
             editAs: "oneCell",
           });
         }
@@ -171,7 +172,7 @@ export async function exportAssetsToExcel(
   });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = `AssetFlow_ทะเบียนครุภัณฑ์_พร้อมรูปภาพ_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  link.download = `AssetFlow_ทะเบียนครุภัณฑ์_พร้อมรูปภาพขยาย_${new Date().toISOString().slice(0, 10)}.xlsx`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
