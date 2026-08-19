@@ -69,10 +69,10 @@ function LoadingScreen() {
 }
 
 function getMainLocationName(fullLocationStr?: string | null) {
-  if (!fullLocationStr) return "จวนผู้ว่าราชการจังหวัดสุราษฎร์ธานี";
+  if (!fullLocationStr) return "จวนผู้ว่าราชการจังหวัด";
   const mainPart = fullLocationStr.split(/\s*>\s*/)[0].trim();
   const stripped = mainPart.replace(/\s*\([^)]*\)/, "").trim();
-  return stripped || mainPart || "จวนผู้ว่าราชการจังหวัดสุราษฎร์ธานี";
+  return stripped || mainPart || "จวนผู้ว่าราชการจังหวัด";
 }
 
 function isAssetInLocation(asset: Asset, locName: string) {
@@ -81,8 +81,7 @@ function isAssetInLocation(asset: Asset, locName: string) {
   const target = locName.toLowerCase();
   if (!locStr) return true;
   if (locStr.includes(target) || target.includes(locStr)) return true;
-  if ((target.includes("จวน") || target.includes("สุราษฎร์")) && (locStr.includes("จวน") || locStr.includes("สุราษฎร์") || locStr.includes("ห้อง"))) return true;
-  return true;
+  return false;
 }
 
 function PanelHead({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
@@ -97,7 +96,7 @@ function PanelHead({ title, action, onAction }: { title: string; action?: string
 function AddLocationModal({ onClose, onAdd }: { onClose: () => void; onAdd: (name: string, rooms: string, department: string) => void }) {
   const [name, setName] = useState("");
   const [rooms, setRooms] = useState("");
-  const [department, setDepartment] = useState("สำนักงานจังหวัด / จวนผู้ว่าฯ");
+  const [department, setDepartment] = useState("สำนักงานจังหวัด");
 
   return (
     <div className="modal-layer" role="dialog" aria-modal="true">
@@ -139,7 +138,7 @@ function AddLocationModal({ onClose, onAdd }: { onClose: () => void; onAdd: (nam
                 type="text"
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
-                placeholder="เช่น สำนักงานจังหวัดสุราษฎร์ธานี"
+                placeholder="เช่น สำนักงานจังหวัด"
               />
             </div>
           </div>
@@ -167,8 +166,8 @@ function EditLocationModal({
   onSave: (oldName: string, newName: string, rooms: string, department: string) => void;
 }) {
   const [name, setName] = useState(locationName);
-  const [rooms, setRooms] = useState(initialRooms || "เรือนรับรอง (ห้องโถงพิธีการชั้น 1), เรือนใหญ่ (ห้องรับรองผู้ว่าราชการจังหวัด)");
-  const [department, setDepartment] = useState(initialDepartment || "สำนักงานจังหวัดสุราษฎร์ธานี");
+  const [rooms, setRooms] = useState(initialRooms || "เรือนรับรอง (ห้องโถงพิธีการชั้น 1), เรือนใหญ่");
+  const [department, setDepartment] = useState(initialDepartment || "สำนักงานจังหวัด");
 
   return (
     <div className="modal-layer" role="dialog" aria-modal="true">
@@ -528,12 +527,9 @@ function LocationDirectoryView({
                 ) as string[];
 
                 const details = locationDetails?.[locName] || {};
-                const isGovResidence = locName.includes("จวนผู้ว่า") || locName.includes("เรือนรับรอง") || locName.includes("สุราษฎร์");
-                const defaultRooms = isGovResidence
-                  ? "เรือนรับรอง (ห้องโถงพิธีการชั้น 1), เรือนใหญ่ (ห้องรับรองผู้ว่าราชการจังหวัด), หอกลอง/หอบูชา"
-                  : "ห้องโถงปฏิบัติงานส่วนกลาง, ห้องเก็บพัสดุ";
+                const defaultRooms = "เรือนรับรอง (ห้องโถงพิธีการชั้น 1), เรือนใหญ่, หอกลอง/หอบูชา";
                 const displayRooms = details.rooms || (subRooms.length ? subRooms.join(", ") : defaultRooms);
-                const displayDepartment = details.department || "สำนักงานจังหวัดสุราษฎร์ธานี";
+                const displayDepartment = details.department || "สำนักงานจังหวัด";
 
                 return (
                   <tr
@@ -975,7 +971,7 @@ function VisualCatalog({
       {isPrintModalOpen && (
         <PrintChecklistModal
           allAssets={allAssets && allAssets.length ? allAssets : assets}
-          allLocations={allLocationsList || ["จวนผู้ว่าราชการจังหวัดสุราษฎร์ธานี"]}
+          allLocations={allLocationsList || ["จวนผู้ว่าราชการจังหวัด"]}
           onClose={() => setIsPrintModalOpen(false)}
           onConfirmPrint={triggerSelectedPrint}
         />
@@ -985,7 +981,7 @@ function VisualCatalog({
       <div className="print-checklist-only">
         <div className="print-header">
           <h2>ใบตรวจนับครุภัณฑ์</h2>
-          <p>หน่วยงาน: {data.actor?.departmentName || "สำนักงานจังหวัดสุราษฎร์ธานี"} · วันที่พิมพ์: {new Date().toLocaleDateString("th-TH")} (รวม {printAssetsPool.length} รายการ)</p>
+          <p>หน่วยงาน: {data.actor?.departmentName || data.meta?.departments?.[0]?.name || "สำนักงานจังหวัด"} · วันที่พิมพ์: {new Date().toLocaleDateString("th-TH")} (รวม {printAssetsPool.length} รายการ)</p>
         </div>
 
         {groupedByRoomForPrint.map(([roomName, roomAssets]) => (
@@ -1129,15 +1125,24 @@ export function AppShell({ section, selectedId }: { section: string; selectedId?
 
   const locationDetails = useMemo(() => {
     const map: Record<string, { rooms?: string; department?: string }> = {};
+    const defaultDept = String(data?.meta?.departments?.[0]?.name || data?.actor?.departmentName || "สำนักงานจังหวัด");
+    (data?.meta?.locations || []).forEach((loc: any) => {
+      if (loc.building) {
+        map[loc.building] = { rooms: String(loc.room || ""), department: defaultDept };
+      }
+    });
     customLocations.forEach((loc) => {
-      map[loc.name] = { rooms: loc.rooms, department: loc.department };
+      map[loc.name] = { rooms: loc.rooms, department: loc.department || defaultDept };
     });
     return map;
-  }, [customLocations]);
+  }, [data, customLocations]);
 
   const allLocationsList = useMemo(() => {
-    if (!data) return ["จวนผู้ว่าราชการจังหวัดสุราษฎร์ธานี"];
+    if (!data) return ["จวนผู้ว่าราชการจังหวัด"];
     const set = new Set<string>();
+    (data.meta?.locations || []).forEach((l: any) => {
+      if (l.building) set.add(l.building);
+    });
     data.assets.forEach((a) => {
       const loc = a.building || a.location;
       if (loc) {
@@ -1145,8 +1150,8 @@ export function AppShell({ section, selectedId }: { section: string; selectedId?
         if (mainName) set.add(mainName);
       }
     });
-    if (set.size === 0) set.add("จวนผู้ว่าราชการจังหวัดสุราษฎร์ธานี");
     customLocations.forEach((c) => set.add(c.name));
+    if (set.size === 0) set.add("จวนผู้ว่าราชการจังหวัด");
     return Array.from(set).filter((name) => !deletedLocationNames.includes(name));
   }, [data, customLocations, deletedLocationNames]);
 
@@ -1223,27 +1228,65 @@ export function AppShell({ section, selectedId }: { section: string; selectedId?
     setCurrentView("catalog");
   }
 
-  function handleAddLocation(name: string, rooms: string, department: string) {
-    setCustomLocations((prev) => [...prev, { name, rooms, department }]);
-    setDeletedLocationNames((prev) => prev.filter((n) => n !== name));
-    setToast(`เพิ่มสถานที่จัดเก็บ "${name}" เรียบร้อยแล้ว`);
-  }
-
-  function handleSaveEditLocation(oldName: string, newName: string, rooms: string, department: string) {
-    setCustomLocations((prev) => {
-      const filtered = prev.filter((x) => x.name !== oldName);
-      return [...filtered, { name: newName, rooms, department }];
-    });
-    if (oldName !== newName) {
-      setDeletedLocationNames((prev) => [...prev, oldName]);
+  async function handleAddLocation(name: string, rooms: string, department: string) {
+    try {
+      const res = await fetch("/api/locations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, rooms, department }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "เพิ่มสถานที่จัดเก็บไม่สำเร็จ");
+      setCustomLocations((prev) => [...prev, { name, rooms, department }]);
+      setDeletedLocationNames((prev) => prev.filter((n) => n !== name));
+      setToast(`เพิ่มสถานที่จัดเก็บ "${name}" เรียบร้อยแล้ว`);
+      await loadData(true);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "เกิดข้อผิดพลาด");
     }
-    setToast(`อัปเดตข้อมูลสถานที่ "${newName}" เรียบร้อยแล้ว`);
   }
 
-  function handleDeleteLocationConfirm(locName: string) {
-    setCustomLocations((prev) => prev.filter((x) => x.name !== locName));
-    setDeletedLocationNames((prev) => [...prev, locName]);
-    setToast(`ลบสถานที่ "${locName}" ออกจากทะเบียนสถานที่เรียบร้อยแล้ว`);
+  async function handleSaveEditLocation(oldName: string, newName: string, rooms: string, department: string) {
+    try {
+      const res = await fetch("/api/locations", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ oldName, newName, rooms, department }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "แก้ไขข้อมูลสถานที่จัดเก็บไม่สำเร็จ");
+      setCustomLocations((prev) => {
+        const filtered = prev.filter((x) => x.name !== oldName);
+        return [...filtered, { name: newName, rooms, department }];
+      });
+      if (oldName !== newName) {
+        setDeletedLocationNames((prev) => [...prev, oldName]);
+      }
+      setToast(`อัปเดตข้อมูลสถานที่ "${newName}" เรียบร้อยแล้ว`);
+      setEditingLocationName(null);
+      await loadData(true);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "เกิดข้อผิดพลาด");
+    }
+  }
+
+  async function handleDeleteLocationConfirm(locName: string) {
+    try {
+      const res = await fetch("/api/locations", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locationName: locName }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "ลบสถานที่จัดเก็บไม่สำเร็จ");
+      setCustomLocations((prev) => prev.filter((x) => x.name !== locName));
+      setDeletedLocationNames((prev) => [...prev, locName]);
+      setToast(`ลบสถานที่ "${locName}" ออกจากทะเบียนสถานที่เรียบร้อยแล้ว`);
+      setDeletingLocationName(null);
+      await loadData(true);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "เกิดข้อผิดพลาด");
+    }
   }
 
   if (loading) return <LoadingScreen />;
