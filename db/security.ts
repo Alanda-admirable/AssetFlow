@@ -18,6 +18,7 @@ function randomBytes(length: number) {
 }
 
 export async function derivePasswordHash(password: string, saltBase64: string, iterations: number) {
+  const safeIterations = Math.min(iterations || 100_000, 100_000);
   const key = await crypto.subtle.importKey(
     "raw",
     encoder.encode(password),
@@ -26,16 +27,17 @@ export async function derivePasswordHash(password: string, saltBase64: string, i
     ["deriveBits"],
   );
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt: fromBase64(saltBase64), iterations },
+    { name: "PBKDF2", hash: "SHA-256", salt: fromBase64(saltBase64), iterations: safeIterations },
     key,
     256,
   );
   return toBase64(new Uint8Array(bits));
 }
 
-export async function createPasswordRecord(password: string, iterations = 210_000) {
+export async function createPasswordRecord(password: string, iterations = 100_000) {
+  const safeIterations = Math.min(iterations, 100_000);
   const salt = toBase64(randomBytes(16));
-  return { hash: await derivePasswordHash(password, salt, iterations), salt, iterations };
+  return { hash: await derivePasswordHash(password, salt, safeIterations), salt, iterations: safeIterations };
 }
 
 export async function verifyPassword(password: string, expectedHash: string, salt: string, iterations: number) {

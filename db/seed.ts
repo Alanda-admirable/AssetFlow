@@ -117,27 +117,32 @@ export async function purgeOldMockups() {
 }
 
 export async function ensureTablesExist() {
-  const client = getRawClient();
-  const migrationDir = path.join(process.cwd(), "drizzle");
-  const migrationFiles = ["0000_acoustic_monster_badoon.sql", "0001_loose_giant_girl.sql"];
+  try {
+    if (typeof fs === "undefined" || !fs.existsSync) return;
+    const migrationDir = path.join(process.cwd(), "drizzle");
+    const migrationFiles = ["0000_acoustic_monster_badoon.sql", "0001_loose_giant_girl.sql"];
 
-  for (const file of migrationFiles) {
-    const fullPath = path.join(migrationDir, file);
-    if (fs.existsSync(fullPath)) {
-      const sqlContent = fs.readFileSync(fullPath, "utf-8");
-      const statements = sqlContent
-        .split("--> statement-breakpoint")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
+    for (const file of migrationFiles) {
+      const fullPath = path.join(migrationDir, file);
+      if (fs.existsSync(fullPath)) {
+        const sqlContent = fs.readFileSync(fullPath, "utf-8");
+        const statements = sqlContent
+          .split("--> statement-breakpoint")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
 
-      for (const statement of statements) {
-        try {
-          await client.execute(statement);
-        } catch {
-          // ignore already exists errors
+        const client = getRawClient();
+        for (const statement of statements) {
+          try {
+            await client.execute(statement);
+          } catch {
+            // ignore already exists errors
+          }
         }
       }
     }
+  } catch {
+    // In serverless edge runtime, local fs is absent; tables are already in Turso DB
   }
 }
 
