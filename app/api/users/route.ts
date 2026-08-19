@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   try {
     const actor = await getActor(request);
-    if (!actor || actor.roleCode !== "admin") {
+    if (!actor || (actor.roleCode !== "admin" && actor.roleCode !== "asset_officer")) {
       return Response.json({ error: "ไม่มีสิทธิ์เข้าถึงข้อมูลผู้ใช้งาน" }, { status: 403 });
     }
     const db = getDb();
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const actor = await getActor(request);
-    if (!actor || actor.roleCode !== "admin") {
+    if (!actor || (actor.roleCode !== "admin" && actor.roleCode !== "asset_officer")) {
       return Response.json({ error: "เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถเพิ่มผู้ใช้งานได้" }, { status: 403 });
     }
     const body = await request.json();

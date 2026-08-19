@@ -1446,8 +1446,12 @@ function Users({ data, helpers }: { data: BootstrapData; helpers?: RenderHelpers
   const [resettingPasswordUser, setResettingPasswordUser] = useState<any | null>(null);
   const [deletingUser, setDeletingUser] = useState<any | null>(null);
   const [toast, setToast] = useState("");
+  const [userList, setUserList] = useState<any[]>(data.users || []);
 
-  const userList = data.users || [];
+  useEffect(() => {
+    setUserList(data.users || []);
+  }, [data.users]);
+
   const rolesList = (data.meta?.roles as any[]) || [
     { id: 1, code: "admin", name: "ผู้ดูแลระบบ" },
     { id: 2, code: "asset_officer", name: "เจ้าหน้าที่พัสดุ" },
@@ -1499,7 +1503,9 @@ function Users({ data, helpers }: { data: BootstrapData; helpers?: RenderHelpers
       if (!res.ok) throw new Error(body.error || "เพิ่มผู้ใช้ไม่สำเร็จ");
       showToast(`เพิ่มผู้ใช้งาน "${payload.fullName}" เรียบร้อยแล้ว`);
       setIsAddUserOpen(false);
-      helpers?.reloadBootstrap?.();
+      if (helpers?.reloadBootstrap) {
+        helpers.reloadBootstrap();
+      }
     } catch (e) {
       alert(e instanceof Error ? e.message : "เกิดข้อผิดพลาด");
     }
@@ -1516,7 +1522,9 @@ function Users({ data, helpers }: { data: BootstrapData; helpers?: RenderHelpers
       if (!res.ok) throw new Error(body.error || "แก้ไขข้อมูลไม่สำเร็จ");
       showToast("อัปเดตข้อมูลผู้ใช้งานเรียบร้อยแล้ว");
       setEditingUser(null);
-      helpers?.reloadBootstrap?.();
+      if (helpers?.reloadBootstrap) {
+        helpers.reloadBootstrap();
+      }
     } catch (e) {
       alert(e instanceof Error ? e.message : "เกิดข้อผิดพลาด");
     }
@@ -1533,7 +1541,9 @@ function Users({ data, helpers }: { data: BootstrapData; helpers?: RenderHelpers
       if (!res.ok) throw new Error(body.error || "รีเซ็ตรหัสผ่านไม่สำเร็จ");
       showToast("รีเซ็ตรหัสผ่านใหม่เรียบร้อยแล้ว");
       setResettingPasswordUser(null);
-      helpers?.reloadBootstrap?.();
+      if (helpers?.reloadBootstrap) {
+        helpers.reloadBootstrap();
+      }
     } catch (e) {
       alert(e instanceof Error ? e.message : "เกิดข้อผิดพลาด");
     }
@@ -1546,9 +1556,12 @@ function Users({ data, helpers }: { data: BootstrapData; helpers?: RenderHelpers
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "ลบผู้ใช้ไม่สำเร็จ");
+      setUserList((prev) => prev.filter((u) => u.id !== id));
       showToast("ลบผู้ใช้งานออกจากระบบเรียบร้อยแล้ว");
       setDeletingUser(null);
-      helpers?.reloadBootstrap?.();
+      if (helpers?.reloadBootstrap) {
+        helpers.reloadBootstrap();
+      }
     } catch (e) {
       alert(e instanceof Error ? e.message : "เกิดข้อผิดพลาด");
     }

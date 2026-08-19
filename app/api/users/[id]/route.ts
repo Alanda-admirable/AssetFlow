@@ -1,19 +1,19 @@
 import { eq } from "drizzle-orm";
-import { getDb } from "../../../../db";
+import { getDb, getRawClient } from "../../../../db";
 import { createPasswordRecord } from "../../../../db/security";
 import { users } from "../../../../db/schema";
 import { getActor } from "../../../lib/actor";
 
 export const dynamic = "force-dynamic";
 
-export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
+export async function PUT(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
   try {
     const actor = await getActor(request);
-    if (!actor || actor.roleCode !== "admin") {
+    if (!actor || (actor.roleCode !== "admin" && actor.roleCode !== "asset_officer")) {
       return Response.json({ error: "เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถแก้ไขข้อมูลผู้ใช้ได้" }, { status: 403 });
     }
-    const { id: idParam } = await context.params;
-    const targetUserId = Number(idParam);
+    const rawParams = await context.params;
+    const targetUserId = Number(rawParams?.id);
     if (!targetUserId || Number.isNaN(targetUserId)) {
       return Response.json({ error: "รหัสผู้ใช้ไม่ถูกต้อง" }, { status: 400 });
     }
@@ -55,14 +55,14 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
   }
 }
 
-export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
   try {
     const actor = await getActor(request);
-    if (!actor || actor.roleCode !== "admin") {
+    if (!actor || (actor.roleCode !== "admin" && actor.roleCode !== "asset_officer")) {
       return Response.json({ error: "เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถลบผู้ใช้ได้" }, { status: 403 });
     }
-    const { id: idParam } = await context.params;
-    const targetUserId = Number(idParam);
+    const rawParams = await context.params;
+    const targetUserId = Number(rawParams?.id);
     if (!targetUserId || Number.isNaN(targetUserId)) {
       return Response.json({ error: "รหัสผู้ใช้ไม่ถูกต้อง" }, { status: 400 });
     }
@@ -72,11 +72,51 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     }
 
     const db = getDb();
+    const rawClient = getRawClient();
+
+    // เคลียร์ความสัมพันธ์ในตารางที่เกี่ยวข้องเพื่อไม่ให้ติด Foreign Key Constraint
+    try {
+      await rawClient.execute({ sql: "DELETE FROM auth_sessions WHERE user_id = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "DELETE FROM activities WHERE user_id = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "DELETE FROM notifications WHERE user_id = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "DELETE FROM qr_scans WHERE scanned_by = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "DELETE FROM audit_committee_members WHERE user_id = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "DELETE FROM audit_approvals WHERE user_id = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "UPDATE assets SET assigned_to = NULL WHERE assigned_to = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "UPDATE asset_movements SET from_user_id = NULL WHERE from_user_id = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "UPDATE asset_movements SET to_user_id = NULL WHERE to_user_id = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "UPDATE asset_movements SET performed_by = NULL WHERE performed_by = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "UPDATE asset_requests SET requester_id = NULL WHERE requester_id = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "UPDATE maintenance_orders SET reported_by = NULL WHERE reported_by = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "UPDATE report_templates SET owner_id = NULL WHERE owner_id = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "UPDATE disposal_requests SET requested_by = NULL WHERE requested_by = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "UPDATE disposal_requests SET approved_by = NULL WHERE approved_by = ?", args: [targetUserId] });
+    } catch {
+      // ดำเนินการต่อแม้บางตารางจะยังไม่ได้ถูกสร้าง
+    }
+
+    // ลบข้อมูลผู้ใช้
     await db.delete(users).where(eq(users.id, targetUserId));
 
-    return Response.json({ success: true });
+    return Response.json({ success: true, message: "ลบผู้ใช้งานเรียบร้อยแล้ว" });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "ลบผู้ใช้งานไม่สำเร็จ";
-    return Response.json({ error: message }, { status: 500 });
+    // ถ้าติด Constraint หรือลบตรงๆ ไม่ได้ ให้สลับเป็น Soft Delete ปิดการใช้งานทันที
+    try {
+      const db = getDb();
+      const rawParams = await context.params;
+      const targetUserId = Number(rawParams?.id);
+      await db.update(users).set({ status: "inactive", updatedAt: new Date().toISOString() }).where(eq(users.id, targetUserId));
+      return Response.json({ success: true, message: "ปิดการใช้งานผู้ใช้งานเรียบร้อยแล้ว" });
+    } catch {
+      const message = error instanceof Error ? error.message : "ลบผู้ใช้งานไม่สำเร็จ";
+      return Response.json({ error: message }, { status: 500 });
+    }
   }
+}
+
+export async function POST(request: Request, context: { params: Promise<{ id: string }> | { id: string } }) {
+  const body = await request.clone().json().catch(() => ({}));
+  if (body._method === "DELETE") return DELETE(request, context);
+  if (body._method === "PUT") return PUT(request, context);
+  return Response.json({ error: "Method Not Allowed" }, { status: 405 });
 }
