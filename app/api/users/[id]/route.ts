@@ -48,7 +48,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
     await db.update(users).set(updateData).where(eq(users.id, targetUserId));
 
-    return Response.json({ success: true });
+    return Response.json({ success: true, message: "อัปเดตข้อมูลผู้ใช้งานเรียบร้อยแล้ว" });
   } catch (error) {
     const message = error instanceof Error ? error.message : "แก้ไขข้อมูลผู้ใช้งานไม่สำเร็จ";
     return Response.json({ error: message }, { status: 500 });
@@ -71,46 +71,52 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
       return Response.json({ error: "ไม่สามารถลบบัญชีผู้ใช้งานของตนเองที่กำลังเข้าสู่ระบบอยู่ได้" }, { status: 400 });
     }
 
-    const db = getDb();
     const rawClient = getRawClient();
 
-    // เคลียร์ความสัมพันธ์ในตารางที่เกี่ยวข้องเพื่อไม่ให้ติด Foreign Key Constraint
+    // ปิด foreign keys ชั่วคราวเพื่อให้สามารถ Hard Delete ผู้ใช้งานและตัดความสัมพันธ์ได้ 100% ถาวร
+    await rawClient.execute("PRAGMA foreign_keys = OFF;");
+
     try {
+      // 1. เคลียร์ตารางที่อ้างอิง user_id
       await rawClient.execute({ sql: "DELETE FROM auth_sessions WHERE user_id = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "DELETE FROM activities WHERE user_id = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "DELETE FROM activity_logs WHERE user_id = ?", args: [targetUserId] });
       await rawClient.execute({ sql: "DELETE FROM notifications WHERE user_id = ?", args: [targetUserId] });
       await rawClient.execute({ sql: "DELETE FROM qr_scans WHERE scanned_by = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "DELETE FROM audit_committee_members WHERE user_id = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "DELETE FROM audit_approvals WHERE user_id = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "UPDATE assets SET assigned_to = NULL WHERE assigned_to = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "DELETE FROM audit_committees WHERE user_id = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "DELETE FROM audit_signoffs WHERE user_id = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "UPDATE audit_items SET checked_by = NULL WHERE checked_by = ?", args: [targetUserId] });
+
+      await rawClient.execute({ sql: "UPDATE assets SET assigned_user_id = NULL WHERE assigned_user_id = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "UPDATE assets SET created_by = NULL WHERE created_by = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "UPDATE asset_images SET uploaded_by = NULL WHERE uploaded_by = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "UPDATE attachments SET uploaded_by = NULL WHERE uploaded_by = ?", args: [targetUserId] });
+      
+      await rawClient.execute({ sql: "UPDATE asset_requests SET requester_id = NULL WHERE requester_id = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "UPDATE asset_request_approvals SET approver_id = NULL WHERE approver_id = ?", args: [targetUserId] });
       await rawClient.execute({ sql: "UPDATE asset_movements SET from_user_id = NULL WHERE from_user_id = ?", args: [targetUserId] });
       await rawClient.execute({ sql: "UPDATE asset_movements SET to_user_id = NULL WHERE to_user_id = ?", args: [targetUserId] });
       await rawClient.execute({ sql: "UPDATE asset_movements SET performed_by = NULL WHERE performed_by = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "UPDATE asset_requests SET requester_id = NULL WHERE requester_id = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "UPDATE maintenance_orders SET reported_by = NULL WHERE reported_by = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "UPDATE report_templates SET owner_id = NULL WHERE owner_id = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "UPDATE asset_handover_signatures SET accepted_by = NULL WHERE accepted_by = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "UPDATE asset_return_inspections SET checked_by = NULL WHERE checked_by = ?", args: [targetUserId] });
+
+      await rawClient.execute({ sql: "UPDATE maintenance_records SET reported_by = NULL WHERE reported_by = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "UPDATE pm_plans SET created_by = NULL WHERE created_by = ?", args: [targetUserId] });
       await rawClient.execute({ sql: "UPDATE disposal_requests SET requested_by = NULL WHERE requested_by = ?", args: [targetUserId] });
       await rawClient.execute({ sql: "UPDATE disposal_requests SET approved_by = NULL WHERE approved_by = ?", args: [targetUserId] });
-    } catch {
-      // ดำเนินการต่อแม้บางตารางจะยังไม่ได้ถูกสร้าง
+      await rawClient.execute({ sql: "UPDATE report_templates SET owner_id = NULL WHERE owner_id = ?", args: [targetUserId] });
+      await rawClient.execute({ sql: "UPDATE import_jobs SET uploaded_by = NULL WHERE uploaded_by = ?", args: [targetUserId] });
+
+      // 2. ลบผู้ใช้งานออกจากตาราง users ถาวร (Hard Delete)
+      const result = await rawClient.execute({ sql: "DELETE FROM users WHERE id = ?", args: [targetUserId] });
+
+      return Response.json({ success: true, message: "ลบผู้ใช้งานออกจากระบบถาวรเรียบร้อยแล้ว", deletedRows: result.rowsAffected });
+    } finally {
+      // เปิด foreign keys กลับคืนสู่ระบบปกติ
+      await rawClient.execute("PRAGMA foreign_keys = ON;");
     }
-
-    // ลบข้อมูลผู้ใช้
-    await db.delete(users).where(eq(users.id, targetUserId));
-
-    return Response.json({ success: true, message: "ลบผู้ใช้งานเรียบร้อยแล้ว" });
   } catch (error) {
-    // ถ้าติด Constraint หรือลบตรงๆ ไม่ได้ ให้สลับเป็น Soft Delete ปิดการใช้งานทันที
-    try {
-      const db = getDb();
-      const rawParams = await context.params;
-      const targetUserId = Number(rawParams?.id);
-      await db.update(users).set({ status: "inactive", updatedAt: new Date().toISOString() }).where(eq(users.id, targetUserId));
-      return Response.json({ success: true, message: "ปิดการใช้งานผู้ใช้งานเรียบร้อยแล้ว" });
-    } catch {
-      const message = error instanceof Error ? error.message : "ลบผู้ใช้งานไม่สำเร็จ";
-      return Response.json({ error: message }, { status: 500 });
-    }
+    const message = error instanceof Error ? error.message : "ลบผู้ใช้งานไม่สำเร็จ";
+    return Response.json({ error: message }, { status: 500 });
   }
 }
 
