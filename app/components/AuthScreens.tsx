@@ -43,10 +43,17 @@ export function LoginScreen() {
   }
 
   return <main className="auth-page">
-    <section className="auth-story">
-      <div className="auth-brand"><span>AF</span><div><strong>AssetFlow</strong><small>ระบบบริหารจัดการครุภัณฑ์</small></div></div>
-      <div className="auth-copy"><p>ASSET OPERATIONS · 2569</p><h1>ของทุกชิ้น<br />มีผู้รับผิดชอบ</h1><span>ติดตามทะเบียน การยืมคืน การซ่อม โอนย้าย ตรวจนับ และเอกสารในพื้นที่เดียว พร้อมแยกสิทธิ์ตามหน้าที่</span></div>
-      <div className="auth-points"><div><b>01</b><span><strong>ผู้ดูแลระบบ</strong><small>จัดการข้อมูล ขั้นตอน และงานหลังบ้านทั้งหมด</small></span></div><div><b>02</b><span><strong>ผู้ใช้งานทั่วไป</strong><small>เห็นเฉพาะทะเบียน คำขอ งานซ่อม และข้อมูลของตน</small></span></div><div><b>03</b><span><strong>ตรวจสอบย้อนหลัง</strong><small>ทุกการทำรายการผูกกับบัญชีผู้ใช้งาน</small></span></div></div>
+    <section className="auth-story" style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "flex-start", padding: "64px 56px" }}>
+      <div className="auth-brand" style={{ marginBottom: "16px" }}>
+        <span style={{ width: "52px", height: "52px", fontSize: "20px" }}>AF</span>
+        <div>
+          <strong style={{ fontSize: "32px", letterSpacing: "-0.5px" }}>AssetFlow</strong>
+          <small style={{ fontSize: "16px", color: "rgba(255,255,255,0.85)", fontWeight: 500 }}>ระบบบริหารจัดการครุภัณฑ์</small>
+        </div>
+      </div>
+      <p style={{ color: "rgba(255,255,255,0.65)", fontSize: "15px", lineHeight: "1.6", maxWidth: "360px", margin: "0" }}>
+        ระบบบันทึกทะเบียนพัสดุ สถานที่จัดเก็บ ตรวจนับครุภัณฑ์ และจัดการสิทธิ์ผู้ใช้งาน
+      </p>
     </section>
     <section className="auth-panel">
       <form className="login-card" onSubmit={submit}>
@@ -55,7 +62,6 @@ export function LoginScreen() {
         <label className="auth-field"><span>User ID</span><input name="username" autoComplete="username" placeholder="เช่น admin" required autoFocus /></label>
         <label className="auth-field"><span>รหัสผ่าน</span><div><input name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="กรอกรหัสผ่าน" required /><button type="button" onClick={() => setShowPassword((value) => !value)}>{showPassword ? "ซ่อน" : "แสดง"}</button></div></label>
         <button className="auth-submit" disabled={busy}>{busy ? "กำลังตรวจสอบ…" : "เข้าสู่ระบบ"}<span>→</span></button>
-        <div className="demo-accounts"><p>บัญชีสำหรับทดลอง</p><button type="button" onClick={() => fillCredentials("admin", "AssetFlow@2569!")}><span>ADMIN</span><strong>admin</strong><small>AssetFlow@2569!</small></button><button type="button" onClick={() => fillCredentials("user.demo", "User@2569!")}><span>USER</span><strong>user.demo</strong><small>User@2569!</small></button></div>
       </form>
     </section>
   </main>;

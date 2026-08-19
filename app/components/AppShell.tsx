@@ -1940,6 +1940,7 @@ function UserFormModal({
   const [departmentName, setDepartmentName] = useState(user?.department || departments[0]?.name || "สำนักงานจังหวัด");
   const [status, setStatus] = useState(user?.status ? String(user.status) : "active");
   const [password, setPassword] = useState("");
+  const [showUserPassword, setShowUserPassword] = useState(false);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -1968,8 +1969,8 @@ function UserFormModal({
       <div className="modal-card" style={{ maxWidth: "580px" }}>
         <div className="modal-head">
           <div>
-            <span>ระบบบริหารบัญชีผู้ใช้งาน</span>
-            <h2>{isEdit ? `แก้ไขสิทธิ์ / ข้อมูลผู้ใช้: ${user.fullName}` : "เพิ่มผู้ใช้งานใหม่"}</h2>
+            <span>ระบบบริหารบัญชีผู้ใช้งานและสิทธิ์</span>
+            <h2>{isEdit ? `แก้ไขสิทธิ์ / ข้อมูลผู้ใช้: ${user.fullName}` : "เพิ่มผู้ใช้งานใหม่ (สร้าง ID & Password)"}</h2>
           </div>
           <button type="button" onClick={onClose}>×</button>
         </div>
@@ -1993,12 +1994,12 @@ function UserFormModal({
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
               <div className="form-field">
-                <span>ชื่อผู้ใช้ (Username) <b>*</b></span>
-                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} required disabled={isEdit} placeholder="somchai.j หรือ admin_2" />
+                <span>ชื่อผู้ใช้ (User ID / Username) <b>*</b></span>
+                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} required disabled={isEdit} placeholder="เช่น admin_2 หรือ officer.p" />
               </div>
               <div className="form-field">
                 <span>อีเมล <b>*</b></span>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="somchai@assetflow.local" />
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="เช่น officer@pathumthani.go.th" />
               </div>
             </div>
 
@@ -2046,24 +2047,38 @@ function UserFormModal({
             </div>
 
             <div className="form-field">
+              <span>{isEdit ? "เปลี่ยนรหัสผ่านใหม่ (Password) — เว้นว่างไว้หากไม่ต้องการเปลี่ยน" : "กำหนดรหัสผ่านเข้าใช้งาน (Password) *"}</span>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input
+                  type={showUserPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={isEdit ? "กรอกรหัสผ่านใหม่" : "เช่น Pss@1234 หรือปล่อยว่างเพื่อใช้ AssetFlow@2569!"}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  type="button"
+                  className="button ghost"
+                  style={{ minWidth: "60px", padding: "0 10px", fontSize: "13px" }}
+                  onClick={() => setShowUserPassword((prev) => !prev)}
+                >
+                  {showUserPassword ? "ซ่อน" : "แสดง"}
+                </button>
+              </div>
+            </div>
+
+            <div className="form-field">
               <span>สถานะผู้ใช้งาน</span>
               <select value={status} onChange={(e) => setStatus(e.target.value)} style={{ padding: "8px", borderRadius: "6px", border: "1px solid #cbd5e1" }}>
                 <option value="active">ใช้งานอยู่ (Active)</option>
                 <option value="suspended">ระงับการใช้งาน (Suspended)</option>
               </select>
             </div>
-
-            {!isEdit && (
-              <div className="form-field">
-                <span>รหัสผ่านเริ่มต้น (Default Password)</span>
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="หากไม่ระบุ จะใช้ AssetFlow@2569!" />
-              </div>
-            )}
           </div>
 
           <div className="modal-foot">
             <button type="button" className="button ghost" onClick={onClose}>ยกเลิก</button>
-            <button type="submit" className="button primary">{isEdit ? "บันทึกการแก้ไข" : "บันทึกผู้ใช้ใหม่"}</button>
+            <button type="submit" className="button primary">{isEdit ? "บันทึกการแก้ไข" : "บันทึกและสร้างผู้ใช้งาน"}</button>
           </div>
         </form>
       </div>
