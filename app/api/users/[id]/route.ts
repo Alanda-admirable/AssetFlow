@@ -73,47 +73,44 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
 
     const rawClient = getRawClient();
 
-    // ปิด foreign keys ชั่วคราวเพื่อให้สามารถ Hard Delete ผู้ใช้งานและตัดความสัมพันธ์ได้ 100% ถาวร
-    await rawClient.execute("PRAGMA foreign_keys = OFF;");
+    // 1. เคลียร์ Foreign Key ในทุกตารางของ SQLite อย่างสมบูรณ์แบบ
+    await rawClient.execute({ sql: "DELETE FROM auth_sessions WHERE user_id = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "DELETE FROM activity_logs WHERE user_id = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "DELETE FROM notifications WHERE user_id = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "DELETE FROM scan_logs WHERE scanned_by = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "DELETE FROM audit_committees WHERE user_id = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "DELETE FROM audit_signoffs WHERE user_id = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "DELETE FROM approval_logs WHERE approver_id = ?", args: [targetUserId] });
 
-    try {
-      // 1. เคลียร์ตารางที่อ้างอิง user_id
-      await rawClient.execute({ sql: "DELETE FROM auth_sessions WHERE user_id = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "DELETE FROM activity_logs WHERE user_id = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "DELETE FROM notifications WHERE user_id = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "DELETE FROM qr_scans WHERE scanned_by = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "DELETE FROM audit_committees WHERE user_id = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "DELETE FROM audit_signoffs WHERE user_id = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "UPDATE audit_items SET checked_by = NULL WHERE checked_by = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "UPDATE assets SET assigned_user_id = NULL WHERE assigned_user_id = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "UPDATE assets SET created_by = NULL WHERE created_by = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "UPDATE asset_images SET uploaded_by = NULL WHERE uploaded_by = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "UPDATE documents SET uploaded_by = NULL WHERE uploaded_by = ?", args: [targetUserId] });
+    
+    await rawClient.execute({ sql: "UPDATE asset_movements SET from_user_id = NULL WHERE from_user_id = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "UPDATE asset_movements SET to_user_id = NULL WHERE to_user_id = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "UPDATE asset_movements SET performed_by = NULL WHERE performed_by = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "UPDATE asset_acceptances SET accepted_by = NULL WHERE accepted_by = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "UPDATE return_checklists SET checked_by = NULL WHERE checked_by = ?", args: [targetUserId] });
 
-      await rawClient.execute({ sql: "UPDATE assets SET assigned_user_id = NULL WHERE assigned_user_id = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "UPDATE assets SET created_by = NULL WHERE created_by = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "UPDATE asset_images SET uploaded_by = NULL WHERE uploaded_by = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "UPDATE attachments SET uploaded_by = NULL WHERE uploaded_by = ?", args: [targetUserId] });
-      
-      await rawClient.execute({ sql: "UPDATE asset_requests SET requester_id = NULL WHERE requester_id = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "UPDATE asset_request_approvals SET approver_id = NULL WHERE approver_id = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "UPDATE asset_movements SET from_user_id = NULL WHERE from_user_id = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "UPDATE asset_movements SET to_user_id = NULL WHERE to_user_id = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "UPDATE asset_movements SET performed_by = NULL WHERE performed_by = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "UPDATE asset_handover_signatures SET accepted_by = NULL WHERE accepted_by = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "UPDATE asset_return_inspections SET checked_by = NULL WHERE checked_by = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "UPDATE audit_items SET checked_by = NULL WHERE checked_by = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "UPDATE audit_sessions SET created_by = NULL WHERE created_by = ?", args: [targetUserId] });
 
-      await rawClient.execute({ sql: "UPDATE maintenance_records SET reported_by = NULL WHERE reported_by = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "UPDATE pm_plans SET created_by = NULL WHERE created_by = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "UPDATE disposal_requests SET requested_by = NULL WHERE requested_by = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "UPDATE disposal_requests SET approved_by = NULL WHERE approved_by = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "UPDATE report_templates SET owner_id = NULL WHERE owner_id = ?", args: [targetUserId] });
-      await rawClient.execute({ sql: "UPDATE import_jobs SET uploaded_by = NULL WHERE uploaded_by = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "UPDATE asset_requests SET requester_id = NULL WHERE requester_id = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "UPDATE maintenance_records SET reported_by = NULL WHERE reported_by = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "UPDATE disposal_requests SET requested_by = NULL WHERE requested_by = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "UPDATE disposal_requests SET approved_by = NULL WHERE approved_by = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "UPDATE saved_reports SET owner_id = NULL WHERE owner_id = ?", args: [targetUserId] });
+    await rawClient.execute({ sql: "UPDATE import_jobs SET uploaded_by = NULL WHERE uploaded_by = ?", args: [targetUserId] });
 
-      // 2. ลบผู้ใช้งานออกจากตาราง users ถาวร (Hard Delete)
-      const result = await rawClient.execute({ sql: "DELETE FROM users WHERE id = ?", args: [targetUserId] });
+    // 2. ลบผู้ใช้งานออกจากตาราง users ถาวร 100% (Hard Delete)
+    const delResult = await rawClient.execute({ sql: "DELETE FROM users WHERE id = ?", args: [targetUserId] });
 
-      return Response.json({ success: true, message: "ลบผู้ใช้งานออกจากระบบถาวรเรียบร้อยแล้ว", deletedRows: result.rowsAffected });
-    } finally {
-      // เปิด foreign keys กลับคืนสู่ระบบปกติ
-      await rawClient.execute("PRAGMA foreign_keys = ON;");
-    }
+    return Response.json({
+      success: true,
+      message: "ลบผู้ใช้งานออกจากระบบอย่างถาวรเรียบร้อยแล้ว",
+      rowsAffected: delResult.rowsAffected
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "ลบผู้ใช้งานไม่สำเร็จ";
     return Response.json({ error: message }, { status: 500 });
