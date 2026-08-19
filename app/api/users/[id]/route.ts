@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb, getRawClient } from "../../../../db";
 import { createPasswordRecord } from "../../../../db/security";
-import { users } from "../../../../db/schema";
+import { departments, users } from "../../../../db/schema";
 import { getActor } from "../../../lib/actor";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     }
 
     const body = await request.json();
-    const { fullName, email, employeeCode, phone, roleId, departmentId, status, resetPassword } = body;
+    const { fullName, email, employeeCode, phone, roleId, departmentId, departmentName, status, resetPassword } = body;
 
     const db = getDb();
     const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.id, targetUserId));
@@ -36,7 +36,24 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     if (employeeCode !== undefined) updateData.employeeCode = employeeCode ? String(employeeCode).trim() : null;
     if (phone !== undefined) updateData.phone = phone ? String(phone).trim() : null;
     if (roleId !== undefined) updateData.roleId = roleId ? Number(roleId) : null;
-    if (departmentId !== undefined) updateData.departmentId = departmentId ? Number(departmentId) : null;
+    
+    // Auto-create or resolve custom department name if typed
+    let targetDeptId = departmentId !== undefined ? (departmentId ? Number(departmentId) : null) : undefined;
+    const customDept = String(departmentName || "").trim();
+    if (customDept) {
+      const [existingDept] = await db.select().from(departments).where(eq(departments.name, customDept)).limit(1);
+      if (existingDept) {
+        targetDeptId = existingDept.id;
+      } else {
+        const [newDept] = await db.insert(departments).values({
+          code: `DEPT-${Date.now().toString().slice(-4)}`,
+          name: customDept,
+        }).returning();
+        targetDeptId = newDept.id;
+      }
+    }
+    if (targetDeptId !== undefined) updateData.departmentId = targetDeptId;
+
     if (status !== undefined) updateData.status = String(status);
 
     if (resetPassword && String(resetPassword).trim()) {

@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถเพิ่มผู้ใช้งานได้" }, { status: 403 });
     }
     const body = await request.json();
-    const { fullName, username, email, employeeCode, phone, roleId, departmentId, status, password } = body;
+    const { fullName, username, email, employeeCode, phone, roleId, departmentId, departmentName, status, password } = body;
 
     if (!fullName || !email || !username) {
       return Response.json({ error: "กรุณากรอกชื่อ-นามสกุล, ชื่อผู้ใช้ และอีเมลให้ครบถ้วน" }, { status: 400 });
@@ -67,6 +67,22 @@ export async function POST(request: Request) {
       return Response.json({ error: "ชื่อผู้ใช้นี้ถูกใช้งานแล้ว" }, { status: 400 });
     }
 
+    // Auto-create or resolve custom department name if typed freely
+    let targetDeptId = departmentId ? Number(departmentId) : null;
+    const customDept = String(departmentName || "").trim();
+    if (customDept) {
+      const [existingDept] = await db.select().from(departments).where(eq(departments.name, customDept)).limit(1);
+      if (existingDept) {
+        targetDeptId = existingDept.id;
+      } else {
+        const [newDept] = await db.insert(departments).values({
+          code: `DEPT-${Date.now().toString().slice(-4)}`,
+          name: customDept,
+        }).returning();
+        targetDeptId = newDept.id;
+      }
+    }
+
     const defaultPassword = password?.trim() || "AssetFlow@2569!";
     const passwordRecord = await createPasswordRecord(defaultPassword);
 
@@ -82,8 +98,8 @@ export async function POST(request: Request) {
         passwordSalt: passwordRecord.salt,
         passwordIterations: passwordRecord.iterations,
         mustChangePassword: false,
-        roleId: roleId ? Number(roleId) : null,
-        departmentId: departmentId ? Number(departmentId) : null,
+        roleId: roleId ? Number(roleId) : 1,
+        departmentId: targetDeptId,
         status: status || "active",
       })
       .returning();

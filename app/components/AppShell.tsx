@@ -1937,7 +1937,7 @@ function UserFormModal({
   const [email, setEmail] = useState(user?.email ? String(user.email) : "");
   const [phone, setPhone] = useState(user?.phone ? String(user.phone) : "");
   const [roleId, setRoleId] = useState(user?.roleId || roles[0]?.id || 1);
-  const [departmentId, setDepartmentId] = useState(user?.departmentId || departments[0]?.id || 1);
+  const [departmentName, setDepartmentName] = useState(user?.department || departments[0]?.name || "สำนักงานจังหวัด");
   const [status, setStatus] = useState(user?.status ? String(user.status) : "active");
   const [password, setPassword] = useState("");
 
@@ -1947,6 +1947,7 @@ function UserFormModal({
       alert("กรุณากรอกข้อมูลสำคัญให้ครบถ้วน");
       return;
     }
+    const matchedDept = departments.find((d) => d.name === departmentName.trim());
     onSubmit({
       fullName: fullName.trim(),
       employeeCode: employeeCode.trim(),
@@ -1954,7 +1955,8 @@ function UserFormModal({
       email: email.trim(),
       phone: phone.trim(),
       roleId: Number(roleId),
-      departmentId: Number(departmentId),
+      departmentId: matchedDept ? matchedDept.id : undefined,
+      departmentName: departmentName.trim(),
       status,
       ...(password.trim() ? { password: password.trim(), resetPassword: password.trim() } : {}),
     });
@@ -1963,7 +1965,7 @@ function UserFormModal({
   return (
     <div className="modal-layer" role="dialog" aria-modal="true">
       <button className="modal-backdrop" onClick={onClose} />
-      <div className="modal-card" style={{ maxWidth: "560px" }}>
+      <div className="modal-card" style={{ maxWidth: "580px" }}>
         <div className="modal-head">
           <div>
             <span>ระบบบริหารบัญชีผู้ใช้งาน</span>
@@ -1992,7 +1994,7 @@ function UserFormModal({
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
               <div className="form-field">
                 <span>ชื่อผู้ใช้ (Username) <b>*</b></span>
-                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} required disabled={isEdit} placeholder="somchai.j" />
+                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} required disabled={isEdit} placeholder="somchai.j หรือ admin_2" />
               </div>
               <div className="form-field">
                 <span>อีเมล <b>*</b></span>
@@ -2002,21 +2004,44 @@ function UserFormModal({
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
               <div className="form-field">
-                <span>บทบาทและสิทธิ์ (Role) <b>*</b></span>
+                <span>บทบาทและสิทธิ์การเข้าถึง (Role) <b>*</b></span>
                 <select value={roleId} onChange={(e) => setRoleId(Number(e.target.value))} style={{ padding: "8px", borderRadius: "6px", border: "1px solid #cbd5e1" }}>
-                  {roles.map((r) => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
-                  ))}
+                  {roles.map((r) => {
+                    const desc = {
+                      admin: "ผู้ดูแลระบบ (Admin) — สิทธิ์เต็มทุกเมนู",
+                      asset_officer: "เจ้าหน้าที่พัสดุ (Officer) — จัดการครุภัณฑ์/สถานที่",
+                      approver: "ผู้อนุมัติ (Approver) — พิจารณาคำขอ ยืม/โอนย้าย",
+                      staff: "เจ้าหน้าที่ทั่วไป (Staff) — ดูข้อมูลและยื่นคำขอ",
+                      auditor: "ผู้ตรวจสอบ (Auditor) — ตรวจนับและออกรายงาน",
+                    }[String(r.code)] || r.name;
+                    return (
+                      <option key={r.id} value={r.id}>{desc}</option>
+                    );
+                  })}
                 </select>
               </div>
 
               <div className="form-field">
-                <span>สังกัดหน่วยงาน <b>*</b></span>
-                <select value={departmentId} onChange={(e) => setDepartmentId(Number(e.target.value))} style={{ padding: "8px", borderRadius: "6px", border: "1px solid #cbd5e1" }}>
+                <span>สังกัดหน่วยงาน (เลือกหรือพิมพ์ได้อิสระ) <b>*</b></span>
+                <input
+                  type="text"
+                  list="dept-options-list"
+                  value={departmentName}
+                  onChange={(e) => setDepartmentName(e.target.value)}
+                  placeholder="เช่น สำนักงานจังหวัดปทุมธานี"
+                  required
+                />
+                <datalist id="dept-options-list">
                   {departments.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
+                    <option key={d.id} value={d.name} />
                   ))}
-                </select>
+                  <option value="สำนักงานจังหวัดปทุมธานี" />
+                  <option value="กลุ่มงานยุทธศาสตร์และข้อมูล" />
+                  <option value="ที่ทำการปกครองจังหวัด" />
+                  <option value="ฝ่ายเทคโนโลยีสารสนเทศ" />
+                  <option value="ฝ่ายการเงินและบัญชี" />
+                  <option value="ฝ่ายทรัพยากรบุคคล" />
+                </datalist>
               </div>
             </div>
 
