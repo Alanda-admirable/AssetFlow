@@ -69,51 +69,8 @@ export async function ensureDemoCredentials() {
 }
 
 export async function purgeOldMockups() {
-  const db = getDb();
-  const allAssets = await db.select().from(assets);
-  for (const item of allAssets) {
-    if (
-      item.assetCode.includes("2569-COM") ||
-      item.assetCode.includes("2568-PRN") ||
-      item.assetCode.includes("2569-AV") ||
-      item.assetCode.includes("2568-NET") ||
-      item.assetCode.includes("2567-FUR") ||
-      item.name.includes("โน้ตบุ๊ก") ||
-      item.name.includes("MacBook") ||
-      item.name.includes("เครื่องพิมพ์") ||
-      item.name.includes("โปรเจคเตอร์") ||
-      item.name.includes("สวิตช์เครือข่าย") ||
-      item.name.includes("เก้าอี้สำนักงาน")
-    ) {
-      await db.delete(assetImages).where(eq(assetImages.assetId, item.id));
-      await db.delete(assetRequestItems).where(eq(assetRequestItems.assetId, item.id));
-      await db.delete(maintenanceRecords).where(eq(maintenanceRecords.assetId, item.id));
-      await db.delete(auditItems).where(eq(auditItems.assetId, item.id));
-      await db.delete(disposalItems).where(eq(disposalItems.assetId, item.id));
-      await db.delete(assets).where(eq(assets.id, item.id));
-    } else if (item.qrToken && item.qrToken.startsWith("AF-")) {
-      await db.update(assets).set({ qrToken: item.assetCode }).where(eq(assets.id, item.id));
-    }
-  }
-
-  // Update any existing unsplash images to the new local copied user images
-  const allImages = await db.select().from(assetImages);
-  const sampleImages = [
-    "/images/media_1785826487933.jpg",
-    "/images/media_1785826488024.jpg",
-    "/images/media_1785826488032.jpg",
-    "/images/media_1785826488044.jpg",
-    "/images/media_1785826488049.jpg",
-  ];
-  let idx = 0;
-  for (const img of allImages) {
-    if (img.objectKey.startsWith("https://images.unsplash.com") || img.objectKey.startsWith("http")) {
-      await db.update(assetImages)
-        .set({ objectKey: sampleImages[idx % sampleImages.length] })
-        .where(eq(assetImages.id, img.id));
-      idx++;
-    }
-  }
+  // No-op in production with real assets
+  return;
 }
 
 export async function ensureTablesExist() {

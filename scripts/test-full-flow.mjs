@@ -1,7 +1,7 @@
 async function testFullFlow() {
-  const url = "https://pathumthani-assetflow.pichet-mekim.workers.dev";
+  const url = "https://assetflow.pathumthani.workers.dev";
   
-  console.log("=== 1. Logging in as admin ===");
+  console.log("=== 1. Logging in as admin on https://assetflow.pathumthani.workers.dev ===");
   const loginRes = await fetch(`${url}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -15,18 +15,23 @@ async function testFullFlow() {
   const loginData = await loginRes.json();
   console.log("Login HTTP status:", loginRes.status);
   console.log("Login user:", loginData.user);
-  console.log("Session cookie set:", cookie ? "Yes" : "No");
 
-  console.log("\n=== 2. Fetching /api/bootstrap with session cookie ===");
+  console.log("\n=== 2. Fetching /api/bootstrap from Live Cloudflare Worker ===");
   const bootstrapRes = await fetch(`${url}/api/bootstrap`, {
     headers: { "Cookie": cookie ? cookie.split(";")[0] : "" }
   });
   const bootstrapData = await bootstrapRes.json();
   console.log("Bootstrap HTTP status:", bootstrapRes.status);
-  console.log("Total assets returned from live Cloudflare Worker:", bootstrapData.assets?.length);
-  console.log("Total locations:", bootstrapData.meta?.locations?.length);
-  console.log("Sample asset 1:", bootstrapData.assets?.[0]?.name, `(${bootstrapData.assets?.[0]?.assetCode})`);
-  console.log("Sample asset 2:", bootstrapData.assets?.[1]?.name, `(${bootstrapData.assets?.[1]?.assetCode})`);
+  console.log("Total assets in live DB:", bootstrapData.assets?.length);
+  console.log("Total locations in live DB:", bootstrapData.meta?.locations?.length);
+  console.log("Total departments in live DB:", bootstrapData.meta?.departments?.length);
+  console.log("Total categories in live DB:", bootstrapData.meta?.categories?.length);
+  
+  console.log("\nตัวอย่าง 3 รายการแรก:");
+  for (let i = 0; i < Math.min(3, bootstrapData.assets?.length || 0); i++) {
+    const a = bootstrapData.assets[i];
+    console.log(`- [${a.assetCode}] ${a.name} (หมวด: ${a.category} | สถานที่: ${a.location})`);
+  }
 }
 
 testFullFlow().catch(console.error);

@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "pathumthani-assetflow",
+  "name": "assetflow",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-08-15",
   "compatibility_flags": [

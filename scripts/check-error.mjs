@@ -1,5 +1,5 @@
 async function checkError() {
-  const url = "https://pathumthani-assetflow.pichet-mekim.workers.dev";
+  const url = "https://assetflow.pathumthani.workers.dev";
   const loginRes = await fetch(`${url}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -9,7 +9,6 @@ async function checkError() {
     })
   });
   console.log("Status:", loginRes.status);
-  console.log("Headers:", Object.fromEntries(loginRes.headers.entries()));
   console.log("Body text:", await loginRes.text());
 }
 
