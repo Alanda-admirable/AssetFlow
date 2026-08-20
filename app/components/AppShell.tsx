@@ -701,14 +701,15 @@ function VisualCatalog({
     const payload = {
       name: formData.get("name"),
       assetCode: formData.get("assetCode"),
+      status: formData.get("status"),
       categoryName: formData.get("categoryName"),
+      location: formData.get("location"),
+      budgetYear: formData.get("budgetYear"),
       imageUrl: formData.get("imageUrl"),
-      building: formData.get("building"),
-      location: formData.get("room"),
       description: formData.get("description"),
       purchasePrice: formData.get("purchasePrice"),
     };
-    const ok = await helpers.post(`/api/assets/${editingAsset.id}`, { ...payload, _method: "PUT" }, "แก้ไขข้อมูลครุภัณฑ์เรียบร้อยแล้ว");
+    const ok = await helpers.post(`/api/assets/${editingAsset.id}`, { ...payload, _method: "PUT" }, "บันทึกการแก้ไขข้อมูลครุภัณฑ์เรียบร้อยแล้ว");
     if (ok) {
       setEditingAsset(null);
       setActiveAsset(null);
@@ -1064,26 +1065,103 @@ function VisualCatalog({
       {editingAsset && (
         <div className="modal-layer" role="dialog" aria-modal="true">
           <button className="modal-backdrop" onClick={() => setEditingAsset(null)} />
-          <div className="modal-card" style={{ maxWidth: "640px", maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
+          <div className="modal-card" style={{ maxWidth: "680px", maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
             <div className="modal-head">
               <div>
-                <span>แก้ไขข้อมูลครุภัณฑ์</span>
+                <span>แก้ไขและกำหนดค่าครุภัณฑ์</span>
                 <h2>{editingAsset.name}</h2>
               </div>
               <button type="button" onClick={() => setEditingAsset(null)}>×</button>
             </div>
             <form onSubmit={handleUpdateSubmit} style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
-              <div className="modal-body" style={{ overflowY: "auto", flex: 1, padding: "20px", gap: "12px" }}>
-                <Field label="ชื่อครุภัณฑ์" name="name" required><input name="name" defaultValue={editingAsset.name} required /></Field>
-                <Field label="รหัสครุภัณฑ์" name="assetCode" required><input name="assetCode" defaultValue={editingAsset.assetCode} required /></Field>
-                <Field label="หมวดหมู่" name="categoryName"><input name="categoryName" defaultValue={editingAsset.category || ""} placeholder="เช่น พระพุทธรูป, ศิลปวัตถุ, เครื่องใช้ไฟฟ้า" /></Field>
-                <Field label="ราคาจัดซื้อ (บาท)" name="purchasePrice" type="number"><input name="purchasePrice" type="number" defaultValue={editingAsset.purchasePrice} /></Field>
-                <Field label="URL รูปภาพ / แนบรูปถ่าย" name="imageUrl"><input name="imageUrl" defaultValue={editingAsset.imageUrl || ""} placeholder="วางลิงก์ URL รูปภาพหรือระบุตำแหน่งรูปถ่าย" /></Field>
-                <Field label="สถานที่จัดเก็บหลัก / อาคาร" name="building"><input name="building" defaultValue={editingAsset.building || ""} placeholder="เช่น จวนผู้ว่าราชการจังหวัด" /></Field>
-                <Field label="ห้อง / รายละเอียดสถานที่" name="room"><input name="room" defaultValue={editingAsset.location || ""} placeholder="เช่น หอกลอง/หอบูชา" /></Field>
+              <div className="modal-body" style={{ overflowY: "auto", flex: 1, padding: "20px", gap: "14px" }}>
+                
+                {/* 1. Name & Code */}
+                <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1.2fr", gap: "12px" }}>
+                  <Field label="ชื่อครุภัณฑ์ / ยี่ห้อ / รุ่น" name="name" required>
+                    <input name="name" defaultValue={editingAsset.name} required />
+                  </Field>
+                  <Field label="รหัสครุภัณฑ์" name="assetCode" required>
+                    <input name="assetCode" defaultValue={editingAsset.assetCode} required />
+                  </Field>
+                </div>
+
+                {/* 2. Status & Category */}
+                <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1.4fr", gap: "12px" }}>
+                  <label className="form-field">
+                    <span>สถานะการใช้งาน <b>*</b></span>
+                    <select
+                      name="status"
+                      defaultValue={editingAsset.status || "available"}
+                      style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px", background: "#ffffff" }}
+                    >
+                      <option value="available">🟢 พร้อมใช้งาน (Available)</option>
+                      <option value="damaged">🔴 ชำรุด (Damaged)</option>
+                      <option value="maintenance">🟠 อยู่ระหว่างซ่อม (Maintenance)</option>
+                      <option value="assigned">🔵 มีผู้รับผิดชอบ (Assigned)</option>
+                      <option value="borrowed">🟣 ถูกยืมใช้งาน (Borrowed)</option>
+                      <option value="disposed">⚫ จำหน่ายแล้ว (Disposed)</option>
+                    </select>
+                  </label>
+
+                  <label className="form-field">
+                    <span>หมวดหมู่ครุภัณฑ์</span>
+                    <input
+                      name="categoryName"
+                      defaultValue={editingAsset.category || ""}
+                      list="edit-category-list"
+                      placeholder="เช่น โต๊ะ, เก้าอี้, คอมพิวเตอร์"
+                    />
+                    <datalist id="edit-category-list">
+                      {categories.filter((c) => c !== "all").map((cat) => (
+                        <option key={cat} value={cat} />
+                      ))}
+                    </datalist>
+                  </label>
+                </div>
+
+                {/* 3. Location & Budget */}
+                <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: "12px" }}>
+                  <label className="form-field">
+                    <span>จุดที่ตั้ง / ห้องจัดเก็บ</span>
+                    <input
+                      name="location"
+                      defaultValue={editingAsset.location || ""}
+                      list="edit-location-list"
+                      placeholder="เช่น ห้องผู้ว่าราชการจังหวัด, ห้องประชุมบัวหลวง"
+                    />
+                    <datalist id="edit-location-list">
+                      {(allLocationsList || []).map((loc) => (
+                        <option key={loc} value={loc} />
+                      ))}
+                    </datalist>
+                  </label>
+
+                  <Field label="ปีงบประมาณ" name="budgetYear">
+                    <input name="budgetYear" defaultValue="2568" placeholder="2568" />
+                  </Field>
+                </div>
+
+                {/* 4. Purchase Price & Image URL */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: "12px" }}>
+                  <Field label="ราคาจัดซื้อ (บาท)" name="purchasePrice" type="number">
+                    <input name="purchasePrice" type="number" defaultValue={editingAsset.purchasePrice || 0} />
+                  </Field>
+                  <Field label="URL รูปภาพถ่ายจริง / ลิงก์รูปภาพ" name="imageUrl">
+                    <input name="imageUrl" defaultValue={editingAsset.imageUrl || ""} placeholder="https://... หรือ /uploads/..." />
+                  </Field>
+                </div>
+
+                {/* 5. Description */}
                 <label className="form-field full">
-                  <span>คำบรรยาย / รายละเอียดพัสดุ</span>
-                  <textarea name="description" defaultValue={editingAsset.description || ""} rows={3} placeholder="คำบรรยายพัสดุ สภาพ ประวัติ..." style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #cbd5e1" }} />
+                  <span>คำบรรยาย / หมายเหตุ / ผู้ครอบครอง</span>
+                  <textarea
+                    name="description"
+                    defaultValue={editingAsset.description || ""}
+                    rows={3}
+                    placeholder="เช่น ส่งคืนแล้ว ชำรุด, ประจำห้องรองฯ, ยี่ห้อ Acer..."
+                    style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #cbd5e1" }}
+                  />
                 </label>
               </div>
               <div className="modal-foot">

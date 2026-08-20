@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
-import { activityLogs, assetCategories, assetImages, assetMovements, assetRequestItems, assets, auditItems, disposalItems, locations, maintenanceRecords } from "../../../../db/schema";
+import { activityLogs, assetCategories, assetImages, assetMovements, assetRequestItems, assets, assetStatuses, auditItems, disposalItems, locations, maintenanceRecords } from "../../../../db/schema";
 import { canManage, getActor } from "../../../lib/actor";
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
@@ -15,7 +15,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     if (!existing) return Response.json({ error: "ไม่พบข้อมูลครุภัณฑ์" }, { status: 404 });
 
     const body = await request.json() as Record<string, any>;
-    let categoryId = body.categoryId !== undefined ? Number(body.categoryId) : existing.categoryId;
+    let categoryId = body.categoryId !== undefined && body.categoryId !== "" ? Number(body.categoryId) : existing.categoryId;
     const categoryName = String(body.categoryName || "").trim();
     const imageUrl = String(body.imageUrl || "").trim();
 
@@ -36,28 +36,43 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       }
     }
 
-    const rawLocation = String(body.locationName || body.location || body.building || "").trim();
-    const room = String(body.room || "").trim();
-    const cabinet = String(body.cabinet || "").trim();
-    let locationId = body.locationId !== undefined ? Number(body.locationId) : existing.locationId;
+    // Status handling
+    let statusId = existing.statusId;
+    if (body.statusId) {
+      statusId = Number(body.statusId);
+    } else if (body.status) {
+      const [st] = await db.select().from(assetStatuses).where(eq(assetStatuses.code, String(body.status))).limit(1);
+      if (st) statusId = st.id;
+    }
 
-    // Auto-create location hierarchy from freeform location string or parts
-    if (rawLocation || room || cabinet) {
-      const parts = rawLocation ? rawLocation.split(/\s*>\s*/).filter(Boolean) : [];
-      if (room) parts.push(room);
-      if (cabinet) parts.push(cabinet);
+    const rawLocation = String(body.locationName || body.location || body.room || body.building || "").trim();
+    let locationId = body.locationId !== undefined && body.locationId !== "" ? Number(body.locationId) : existing.locationId;
 
-      const fullBuilding = parts[0] || "จวนผู้ว่าราชการจังหวัด";
-      const fullRoom = parts.slice(1).join(" > ") || "ทั่วไป";
-      const locCode = `LOC-${Date.now().toString().slice(-4)}`;
-      const [newLoc] = await db.insert(locations).values({
-        code: locCode,
-        building: fullBuilding,
-        floor: "1",
-        room: fullRoom,
-        isActive: true,
-      }).returning();
-      locationId = newLoc.id;
+    // Lookup or create location if name provided
+    if (!locationId && rawLocation) {
+      const [existingLoc] = await db.select().from(locations).where(eq(locations.room, rawLocation)).limit(1);
+      if (existingLoc) {
+        locationId = existingLoc.id;
+      } else {
+        const locCode = `LOC-${Date.now().toString().slice(-4)}`;
+        const [newLoc] = await db.insert(locations).values({
+          code: locCode,
+          building: "ศาลากลางจังหวัดปทุมธานี",
+          floor: "1",
+          room: rawLocation,
+          isActive: true,
+        }).returning();
+        locationId = newLoc.id;
+      }
+    }
+
+    let condition = existing.condition;
+    if (body.condition) {
+      condition = String(body.condition);
+    } else if (body.status === "damaged") {
+      condition = "damaged";
+    } else if (body.status === "available") {
+      condition = "good";
     }
 
     const updateData = {
@@ -67,8 +82,10 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       budgetYear: body.budgetYear ? String(body.budgetYear).trim() : existing.budgetYear,
       purchasePrice: body.purchasePrice !== undefined ? Number(body.purchasePrice) : existing.purchasePrice,
       categoryId,
+      statusId,
       locationId,
-      updatedAt: new Date().toISOString(),
+      condition,
+      updatedAt: new Date().toISOString().replace("T", " ").slice(0, 19),
     };
 
     const [updated] = await db.update(assets).set(updateData).where(eq(assets.id, assetId)).returning();
