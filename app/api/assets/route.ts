@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       if (existingCategory) {
         categoryId = existingCategory.id;
       } else {
-        const categoryCode = `CAT-${Date.now().toString().slice(-4)}`;
+        const categoryCode = `CAT-${Date.now().toString(36)}`;
         const [newCat] = await db.insert(assetCategories).values({
           code: categoryCode,
           name: categoryName,
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
 
       const fullBuilding = parts[0] || "จวนผู้ว่าราชการจังหวัด";
       const fullRoom = parts.slice(1).join(" > ") || "ทั่วไป";
-      const locCode = `LOC-${Date.now().toString().slice(-4)}`;
+      const locCode = `LOC-${Date.now().toString(36)}`;
       const [newLoc] = await db.insert(locations).values({
         code: locCode,
         building: fullBuilding,

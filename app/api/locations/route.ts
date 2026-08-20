@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { getDb, getRawClient } from "../../../db";
 import { assets, departments, locations } from "../../../db/schema";
-import { getActor } from "../../lib/actor";
+import { canManage, getActor } from "../../lib/actor";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +27,7 @@ export async function POST(request: Request) {
   try {
     const actor = await getActor(request);
     if (!actor) return Response.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
+    if (!canManage(actor)) return Response.json({ error: "ไม่มีสิทธิ์จัดการสถานที่" }, { status: 403 });
 
     const body = await request.json();
     const { name, rooms, department } = body;
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
         deptId = existingDept.id;
       } else {
         const [newDept] = await db.insert(departments).values({
-          code: `DEPT-${Date.now().toString().slice(-4)}`,
+          code: `DEPT-${Date.now().toString(36)}`,
           name: deptName,
         }).returning();
         deptId = newDept.id;
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
     }
 
     // สร้าง Location
-    const locCode = `LOC-${Date.now().toString().slice(-4)}`;
+    const locCode = `LOC-${Date.now().toString(36)}`;
     const [newLoc] = await db.insert(locations).values({
       code: locCode,
       building: locName,
@@ -78,6 +79,7 @@ export async function PUT(request: Request) {
   try {
     const actor = await getActor(request);
     if (!actor) return Response.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
+    if (!canManage(actor)) return Response.json({ error: "ไม่มีสิทธิ์จัดการสถานที่" }, { status: 403 });
 
     const body = await request.json();
     const { oldName, newName, rooms, department } = body;
@@ -93,16 +95,11 @@ export async function PUT(request: Request) {
 
     const rawClient = getRawClient();
 
-    // 1. อัปเดตตาราง locations
+    // 1. อัปเดตตาราง locations — exact match only, no LIKE
     if (rawOldName && rawOldName !== targetNewName) {
       await rawClient.execute({
-        sql: "UPDATE locations SET building = ? WHERE building = ? OR building LIKE ?",
-        args: [targetNewName, rawOldName, `%${rawOldName}%`],
-      });
-    } else {
-      await rawClient.execute({
         sql: "UPDATE locations SET building = ? WHERE building = ?",
-        args: [targetNewName, targetNewName],
+        args: [targetNewName, rawOldName],
       });
     }
 
@@ -113,17 +110,21 @@ export async function PUT(request: Request) {
       });
     }
 
-    // 2. อัปเดตตาราง departments
+    // 2. อัปเดตตาราง departments — find by location's departmentId, not first row
     if (targetDept) {
       const db = getDb();
-      const [existingDept] = await db.select().from(departments).limit(1);
-      if (existingDept) {
-        await db.update(departments).set({ name: targetDept }).where(eq(departments.id, existingDept.id));
+      const locRows = await rawClient.execute({
+        sql: "SELECT department_id FROM locations WHERE building = ? LIMIT 1",
+        args: [targetNewName],
+      });
+      const deptId = locRows.rows[0]?.department_id;
+      if (deptId) {
+        await db.update(departments).set({ name: targetDept }).where(eq(departments.id, Number(deptId)));
       } else {
-        await db.insert(departments).values({
-          code: "DEPT-MAIN",
-          name: targetDept,
-        });
+        const [existingDept] = await db.select().from(departments).where(eq(departments.name, targetDept)).limit(1);
+        if (!existingDept) {
+          await db.insert(departments).values({ code: `DEPT-${Date.now().toString(36)}`, name: targetDept });
+        }
       }
     }
 
@@ -132,7 +133,7 @@ export async function PUT(request: Request) {
     if (Number(locCheck.rows[0]?.count || 0) === 0) {
       await rawClient.execute({
         sql: "INSERT INTO locations (code, building, floor, room, is_active) VALUES (?, ?, '1', ?, 1);",
-        args: [`LOC-${Date.now().toString().slice(-4)}`, targetNewName, targetRooms || "ห้องทั่วไป"],
+        args: [`LOC-${Date.now().toString(36)}`, targetNewName, targetRooms || "ห้องทั่วไป"],
       });
     }
 
@@ -151,6 +152,7 @@ export async function DELETE(request: Request) {
   try {
     const actor = await getActor(request);
     if (!actor) return Response.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
+    if (!canManage(actor)) return Response.json({ error: "ไม่มีสิทธิ์จัดการสถานที่" }, { status: 403 });
 
     const body = await request.json().catch(() => ({}));
     const locName = String(body.locationName || "").trim();

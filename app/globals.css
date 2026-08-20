@@ -35,7 +35,17 @@ h1, h2, h3, strong, b { font-family: var(--font-display), var(--font-body), sans
 .brand div:last-child { display: grid; }
 .brand strong { font-size: 19px; line-height: 1.1; letter-spacing: -.2px; }
 .brand span { margin-top: 4px; color: #9fc0cb; font-size: 11px; }
-.nav-scroll { overflow-y: auto; padding: 18px 12px 120px; scrollbar-width: thin; }
+.nav-scroll {
+  overflow-y: auto;
+  padding: 16px 10px 120px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.nav-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
 .nav-group { margin-bottom: 17px; }
 .nav-group > p { margin: 0 10px 7px; color: #7594a4; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; }
 .nav-group a { min-height: 40px; display: flex; align-items: center; gap: 10px; margin-bottom: 3px; padding: 7px 10px; border-radius: 9px; color: #c5d9e0; transition: background .16s ease, color .16s ease, transform .16s ease; }
@@ -45,13 +55,13 @@ h1, h2, h3, strong, b { font-family: var(--font-display), var(--font-body), sans
 .nav-group a.active .nav-icon { color: var(--teal); border-color: #b4d8d4; background: #e7f3f1; }
 .nav-group a b { min-width: 21px; margin-left: auto; padding: 2px 6px; border-radius: 999px; background: #e77b35; color: #fff; text-align: center; font-size: 10px; }
 
-.nav-item-btn { width: 100%; min-height: 38px; display: flex; align-items: center; gap: 9px; margin-bottom: 4px; padding: 7px 10px; border-radius: 9px; color: #c5d9e0; border: 0; background: transparent; text-align: left; cursor: pointer; transition: background .16s ease, color .16s ease, transform .16s ease; font-size: 12px; }
-.nav-item-btn:hover { background: rgba(255,255,255,.08); color: #fff; transform: translateX(2px); }
-.nav-item-btn.active { background: #f3f8f7; color: var(--navy-dark); font-weight: 700; box-shadow: 0 6px 16px rgba(0,0,0,.18); }
-.nav-item-btn.active .nav-icon { color: var(--teal); border-color: #b4d8d4; background: #e7f3f1; }
-.nav-item-btn b.count-badge { min-width: 20px; margin-left: auto; padding: 2px 7px; border-radius: 999px; background: #e77b35; color: #fff; text-align: center; font-size: 10px; font-weight: 700; }
-.nav-item-btn.active b.count-badge { background: #0f766e; }
-.nav-label-truncate { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-item-btn { width: 100%; min-height: 36px; display: flex; align-items: center; gap: 8px; margin-bottom: 2px; padding: 7px 10px; border-radius: 8px; color: #cbd5e1; border: 0; background: transparent; text-align: left; cursor: pointer; transition: all .15s ease; font-size: 12px; }
+.nav-item-btn:hover { background: rgba(255,255,255,.06); color: #ffffff; }
+.nav-item-btn.active { background: rgba(15, 118, 110, 0.28) !important; color: #5eead4 !important; font-weight: 700; border-left: 3px solid #14b8a6; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+.nav-item-btn.active .nav-icon { color: #5eead4; border-color: rgba(94, 234, 212, 0.3); background: rgba(15, 118, 110, 0.4); }
+.nav-item-btn b.count-badge { min-width: 18px; margin-left: auto; padding: 2px 6px; border-radius: 999px; background: rgba(255,255,255,.08); color: #94a3b8; text-align: center; font-size: 10px; font-weight: 700; transition: all .15s ease; }
+.nav-item-btn.active b.count-badge { background: #14b8a6 !important; color: #042f2e !important; }
+.nav-label-truncate { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 .sidebar-user { position: absolute; inset: auto 0 0; height: 78px; display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: #0d263e; border-top: 1px solid rgba(255,255,255,.08); }
 .avatar { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 11px; background: #d9eee9; color: var(--teal); font-weight: 800; }
 .sidebar-user > div:nth-child(2) { min-width: 0; display: grid; flex: 1; }
@@ -541,3 +551,46 @@ tbody tr:hover { background: #fbfcfc; }
   color: #64748b;
   font-size: 11px;
 }
+
+/* Modern UI Refinements */
+.catalog-card:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04) !important;
+  border-color: #cbd5e1 !important;
+}
+
+.table-row-hover:hover {
+  background-color: #f8fafc !important;
+}
+
+.table-row-hover:hover td {
+  background-color: transparent !important;
+}
+
+/* Hide scrollbar for category pills while maintaining scroll */
+.catalog-filter-bar::-webkit-scrollbar,
+.category-pills::-webkit-scrollbar {
+  display: none;
+}
+
+/* Modern Global Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+

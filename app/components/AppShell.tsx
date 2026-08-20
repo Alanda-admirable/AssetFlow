@@ -1,9 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ChangeEvent, FormEvent, Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { canAccessSection, navigationForRole, sectionTitles } from "../lib/navigation";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import type { Asset, BootstrapData, RequestRow } from "../lib/types";
 import { exportAssetsToExcel } from "../lib/excelExport";
 
@@ -52,7 +50,7 @@ function badge(status: string | null | undefined, color?: string | null) {
 
 function exportAssets(rows: Asset[]) {
   const headers = ["รหัสครุภัณฑ์", "ชื่อครุภัณฑ์", "หมวดหมู่", "ที่ตั้ง", "มูลค่าจัดซื้อ"];
-  const csv = [headers.join(","), ...rows.map((r) => [r.assetCode, r.name, r.category || "", r.location || "", r.purchasePrice || 0].map((v) => `"${v}"`).join(","))].join("\n");
+  const csv = [headers.join(","), ...rows.map((r) => [r.assetCode, r.name, r.category || "", r.location || "", r.purchasePrice || 0].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))].join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
@@ -83,18 +81,27 @@ function getCategoryIcon(category?: string | null) {
   return "📦";
 }
 
+function getRoomIcon(roomName?: string | null) {
+  const r = (roomName || "").toLowerCase();
+  if (r.includes("ผู้ว่า") || r.includes("รองผู้ว่า")) return "🏛️";
+  if (r.includes("ประชุม")) return "👥";
+  if (r.includes("ศาลารักษ์")) return "🏛️";
+  if (r.includes("รับ-ส่ง")) return "📬";
+  if (r.includes("ตรวจสอบ") || r.includes("บุคคล") || r.includes("ศูนย์ดำรงธรรม") || r.includes("อำนวยการ")) return "🏢";
+  return "📍";
+}
+
 function getMainLocationName(fullLocationStr?: string | null) {
-  if (!fullLocationStr) return "สำนักงานจังหวัดปทุมธานี";
+  if (!fullLocationStr) return "";
   const mainPart = fullLocationStr.split(/\s*>\s*/)[0].trim();
-  return mainPart || "สำนักงานจังหวัดปทุมธานี";
+  return mainPart || "";
 }
 
 function isAssetInLocation(asset: Asset, locName: string) {
   if (!locName || locName === "all") return true;
-  const locStr = (asset.location || asset.building || "").toLowerCase();
-  const target = locName.toLowerCase();
+  const locStr = (asset.location || asset.building || "");
   if (!locStr) return false;
-  return locStr === target || locStr.includes(target) || target.includes(locStr);
+  return locStr === locName;
 }
 
 function PanelHead({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
@@ -179,7 +186,7 @@ function EditLocationModal({
   onSave: (oldName: string, newName: string, rooms: string, department: string) => void;
 }) {
   const [name, setName] = useState(locationName);
-  const [rooms, setRooms] = useState(initialRooms || "เรือนรับรอง (ห้องโถงพิธีการชั้น 1), เรือนใหญ่");
+  const [rooms, setRooms] = useState(initialRooms || "");
   const [department, setDepartment] = useState(initialDepartment || "สำนักงานจังหวัด");
 
   return (
@@ -507,19 +514,18 @@ function LocationDirectoryView({
       <div className="table-wrap">
         <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
           <thead>
-            <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0", fontSize: "12px", color: "#475569" }}>
+            <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0", fontSize: "12px", color: "#475569", fontWeight: 700 }}>
               <th style={{ padding: "12px 16px", width: "60px", textAlign: "center" }}>ลำดับ</th>
-              <th style={{ padding: "12px 16px" }}>สถานที่จัดเก็บหลัก / อาคาร</th>
-              <th style={{ padding: "12px 16px" }}>หน่วยงานรับผิดชอบ</th>
-              <th style={{ padding: "12px 16px" }}>รายละเอียดอาคาร / ห้องย่อยภายใน</th>
-              <th style={{ padding: "12px 16px", textAlign: "center", width: "120px" }}>จำนวนพัสดุ</th>
-              <th style={{ padding: "12px 16px", textAlign: "right", width: "260px" }}>การจัดการ</th>
+              <th style={{ padding: "12px 16px" }}>สถานที่จัดเก็บหลัก / อาคาร / ห้อง</th>
+              <th style={{ padding: "12px 16px", width: "220px" }}>หน่วยงานรับผิดชอบ</th>
+              <th style={{ padding: "12px 16px", textAlign: "center", width: "140px" }}>จำนวนพัสดุ</th>
+              <th style={{ padding: "12px 16px", textAlign: "right", width: "220px" }}>การจัดการ</th>
             </tr>
           </thead>
           <tbody>
             {locations.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: "32px", textAlign: "center", color: "#64748b" }}>
+                <td colSpan={5} style={{ padding: "32px", textAlign: "center", color: "#64748b" }}>
                   ยังไม่มีสถานที่จัดเก็บในระบบ กดปุ่ม <strong>+ เพิ่มสถานที่จัดเก็บใหม่</strong> เพื่อสร้างรายการแรก
                 </td>
               </tr>
@@ -540,9 +546,8 @@ function LocationDirectoryView({
                 ) as string[];
 
                 const details = locationDetails?.[locName] || {};
-                const defaultRooms = "เรือนรับรอง (ห้องโถงพิธีการชั้น 1), เรือนใหญ่, หอกลอง/หอบูชา";
-                const displayRooms = details.rooms || (subRooms.length ? subRooms.join(", ") : defaultRooms);
-                const displayDepartment = details.department || "สำนักงานจังหวัด";
+                const displayRooms = details.rooms || (subRooms.length ? subRooms.join(", ") : "—");
+                const displayDepartment = details.department || "—";
 
                 return (
                   <tr
@@ -551,20 +556,27 @@ function LocationDirectoryView({
                       borderBottom: "1px solid #f1f5f9",
                       fontSize: "13px",
                       transition: "background-color 0.15s ease",
+                      cursor: "pointer"
                     }}
                     className="table-row-hover"
+                    onClick={() => onSelectLocation(locName)}
                   >
-                    <td style={{ padding: "14px 16px", textAlign: "center", fontWeight: "bold", color: "#64748b" }}>
+                    <td style={{ padding: "14px 16px", textAlign: "center", fontWeight: "bold", color: "#94a3b8", fontSize: "12px" }}>
                       {idx + 1}
                     </td>
                     <td style={{ padding: "14px 16px" }}>
-                      <strong style={{ color: "#0f172a", fontSize: "14px", display: "block" }}>{locName}</strong>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "18px" }}>🏢</span>
+                        <div>
+                          <strong style={{ color: "#0f172a", fontSize: "13px", display: "block" }}>{locName}</strong>
+                          {displayRooms !== locName && displayRooms !== "—" && (
+                            <span style={{ fontSize: "11px", color: "#64748b", display: "block", marginTop: "2px" }}>{displayRooms}</span>
+                          )}
+                        </div>
+                      </div>
                     </td>
-                    <td style={{ padding: "14px 16px", color: "#0f766e", fontWeight: 600 }}>
+                    <td style={{ padding: "14px 16px", color: "#0f766e", fontWeight: 600, fontSize: "12px" }}>
                       {displayDepartment}
-                    </td>
-                    <td style={{ padding: "14px 16px", color: "#475569", maxWidth: "340px", lineHeight: "1.4" }}>
-                      {displayRooms}
                     </td>
                     <td style={{ padding: "14px 16px", textAlign: "center" }}>
                       <span
@@ -572,44 +584,44 @@ function LocationDirectoryView({
                           background: "#f0fdfa",
                           color: "#0f766e",
                           fontSize: "12px",
-                          fontWeight: "bold",
-                          padding: "4px 12px",
-                          borderRadius: "20px",
-                          border: "1px solid #b5d5d0",
+                          fontWeight: 700,
+                          padding: "4px 10px",
+                          borderRadius: "16px",
+                          border: "1px solid #ccfbf1",
                           display: "inline-block",
                         }}
                       >
                         {locAssets.length} รายการ
                       </span>
                     </td>
-                    <td style={{ padding: "14px 16px", textAlign: "right" }}>
+                    <td style={{ padding: "14px 16px", textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
                       <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
                         <button
                           type="button"
                           className="button primary"
-                          style={{ fontSize: "12px", padding: "6px 10px", gap: "4px" }}
+                          style={{ fontSize: "11px", padding: "5px 10px", gap: "4px", background: "#0f766e", borderColor: "#0f766e" }}
                           onClick={() => onSelectLocation(locName)}
                         >
-                          <span>แคตตาล็อกรูปภาพ</span>
+                          <span>เปิดดู</span>
                           <span>→</span>
                         </button>
                         <button
                           type="button"
                           className="button ghost"
-                          style={{ fontSize: "12px", padding: "6px 8px" }}
+                          style={{ fontSize: "11px", padding: "5px 8px", borderColor: "#cbd5e1" }}
                           onClick={() => onEditLocation(locName)}
                           title="แก้ไขสถานที่"
                         >
-                          แก้ไข
+                          ✏️ แก้ไข
                         </button>
                         <button
                           type="button"
-                          className="button danger"
-                          style={{ fontSize: "12px", padding: "6px 8px" }}
+                          className="button ghost"
+                          style={{ fontSize: "11px", padding: "5px 8px", borderColor: "#fecaca", color: "#ef4444" }}
                           onClick={() => onDeleteLocation(locName)}
                           title="ลบสถานที่"
                         >
-                          ลบ
+                          🗑️ ลบ
                         </button>
                       </div>
                     </td>
@@ -693,9 +705,12 @@ function VisualCatalog({
     }
   }
 
+  const [savingEdit, setSavingEdit] = useState(false);
+
   async function handleUpdateSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!editingAsset) return;
+    if (!editingAsset || savingEdit) return;
+    setSavingEdit(true);
     const form = e.currentTarget;
     const formData = new FormData(form);
     const payload = {
@@ -710,6 +725,7 @@ function VisualCatalog({
       purchasePrice: formData.get("purchasePrice"),
     };
     const ok = await helpers.post(`/api/assets/${editingAsset.id}`, { ...payload, _method: "PUT" }, "บันทึกการแก้ไขข้อมูลครุภัณฑ์เรียบร้อยแล้ว");
+    setSavingEdit(false);
     if (ok) {
       setEditingAsset(null);
       setActiveAsset(null);
@@ -738,77 +754,74 @@ function VisualCatalog({
 
   return (
     <div className="catalog-wrapper">
-      {/* Category Pills & Action Toolbar */}
-      <div className="catalog-filter-bar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "16px", flexWrap: "wrap" }}>
-        <div className="category-pills" style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+      {/* 1. Top Action Toolbar */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "12px", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
           {onBackToDirectory && (
             <button
               className="button ghost"
-              style={{ padding: "6px 12px", fontSize: "13px" }}
+              style={{ padding: "6px 12px", fontSize: "13px", display: "inline-flex", alignItems: "center", gap: "4px", borderColor: "#cbd5e1" }}
               onClick={onBackToDirectory}
             >
-              ← ทะเบียนสถานที่
+              <span>←</span> <span>ทะเบียนสถานที่</span>
             </button>
           )}
 
-          {/* View Mode Toggle */}
-          <div style={{ display: "inline-flex", background: "#e2e8f0", padding: "3px", borderRadius: "8px", gap: "2px" }}>
+          {/* View Mode Toggle Segmented Control */}
+          <div style={{ display: "inline-flex", background: "#e2e8f0", padding: "3px", borderRadius: "10px", gap: "2px", border: "1px solid #cbd5e1" }}>
             <button
               type="button"
               onClick={() => setViewMode("table")}
               style={{
-                padding: "4px 10px",
+                padding: "6px 12px",
                 fontSize: "12px",
                 fontWeight: 600,
-                borderRadius: "6px",
+                borderRadius: "7px",
                 border: "none",
                 background: viewMode === "table" ? "#ffffff" : "transparent",
-                color: viewMode === "table" ? "#0f766e" : "#475569",
+                color: viewMode === "table" ? "#0f766e" : "#64748b",
                 boxShadow: viewMode === "table" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
-                cursor: "pointer"
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "5px"
               }}
             >
-              📋 ตาราง ({displayedAssets.length})
+              <span>📋</span> <span>ตาราง ({displayedAssets.length})</span>
             </button>
             <button
               type="button"
               onClick={() => setViewMode("grid")}
               style={{
-                padding: "4px 10px",
+                padding: "6px 12px",
                 fontSize: "12px",
                 fontWeight: 600,
-                borderRadius: "6px",
+                borderRadius: "7px",
                 border: "none",
                 background: viewMode === "grid" ? "#ffffff" : "transparent",
-                color: viewMode === "grid" ? "#0f766e" : "#475569",
+                color: viewMode === "grid" ? "#0f766e" : "#64748b",
                 boxShadow: viewMode === "grid" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
-                cursor: "pointer"
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "5px"
               }}
             >
-              🖼️ การ์ดรูปภาพ
+              <span>🖼️</span> <span>การ์ดรูปภาพ</span>
             </button>
           </div>
-
-          <button
-            className={`pill-btn ${selectedCategory === "all" ? "active" : ""}`}
-            onClick={() => setSelectedCategory("all")}
-          >
-            ทั้งหมด ({assets.length})
-          </button>
-          {categories.filter((c) => c !== "all").map((cat) => (
-            <button
-              key={cat}
-              className={`pill-btn ${selectedCategory === cat ? "active" : ""}`}
-              onClick={() => setSelectedCategory(cat)}
-            >
-              <span>{getCategoryIcon(cat)} {cat}</span> ({assets.filter((a) => a.category === cat).length})
-            </button>
-          ))}
         </div>
 
-        <div className="catalog-actions" style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+        {/* Primary Action Buttons Group */}
+        <div className="catalog-actions" style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
           {canManage && (
-            <button className="button primary" onClick={() => helpers.setModal("asset")}>
+            <button
+              className="button primary"
+              style={{ background: "#0f766e", borderColor: "#0f766e", boxShadow: "0 2px 8px rgba(15,118,110,0.25)" }}
+              onClick={() => helpers.setModal("asset")}
+            >
               + เพิ่มข้อมูลครุภัณฑ์
             </button>
           )}
@@ -817,7 +830,7 @@ function VisualCatalog({
             onClick={handleExportExcel}
             disabled={isExportingExcel}
             title="ส่งออกทะเบียนครุภัณฑ์เป็นไฟล์ Excel"
-            style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontWeight: 600 }}
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontWeight: 600, borderColor: "#cbd5e1" }}
           >
             {isExportingExcel ? (
               <span>⏳ กำลังสร้าง Excel ({exportProgress ? `${exportProgress.current}/${exportProgress.total}` : "..."})</span>
@@ -829,88 +842,186 @@ function VisualCatalog({
             className="button ghost"
             onClick={() => exportAssets(displayedAssets)}
             title="ส่งออกเฉพาะข้อความแบบ CSV"
-            style={{ padding: "8px 10px", fontSize: "12px", opacity: 0.75 }}
+            style={{ padding: "8px 12px", fontSize: "12px", borderColor: "#cbd5e1", color: "#64748b" }}
           >
             CSV
           </button>
-          <button className="button primary" onClick={() => setIsPrintModalOpen(true)}>
+          <button
+            className="button primary"
+            style={{ background: "#1e293b", borderColor: "#1e293b" }}
+            onClick={() => setIsPrintModalOpen(true)}
+          >
             🖨️ พิมพ์ใบตรวจนับ
           </button>
         </div>
       </div>
 
+      {/* 2. Category Filter Pills Shelf */}
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: "6px",
+          padding: "8px 10px",
+          background: "#f8fafc",
+          border: "1px solid #e2e8f0",
+          borderRadius: "12px",
+          marginBottom: "16px"
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setSelectedCategory("all")}
+          style={{
+            padding: "6px 12px",
+            fontSize: "12px",
+            fontWeight: 600,
+            borderRadius: "20px",
+            border: selectedCategory === "all" ? "1px solid #0f766e" : "1px solid #e2e8f0",
+            background: selectedCategory === "all" ? "#0f766e" : "#ffffff",
+            color: selectedCategory === "all" ? "#ffffff" : "#475569",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            boxShadow: selectedCategory === "all" ? "0 2px 6px rgba(15,118,110,0.2)" : "0 1px 2px rgba(0,0,0,0.02)",
+            transition: "all 0.15s ease"
+          }}
+        >
+          <span>ทั้งหมด</span>
+          <span
+            style={{
+              padding: "1px 6px",
+              borderRadius: "10px",
+              fontSize: "11px",
+              background: selectedCategory === "all" ? "rgba(255,255,255,0.25)" : "#f1f5f9",
+              color: selectedCategory === "all" ? "#ffffff" : "#64748b"
+            }}
+          >
+            {assets.length}
+          </span>
+        </button>
+
+        {categories.filter((c) => c !== "all").map((cat) => {
+          const isSelected = selectedCategory === cat;
+          const catCount = assets.filter((a) => a.category === cat).length;
+          return (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => setSelectedCategory(cat)}
+              style={{
+                padding: "6px 12px",
+                fontSize: "12px",
+                fontWeight: 600,
+                borderRadius: "20px",
+                border: isSelected ? "1px solid #0f766e" : "1px solid #e2e8f0",
+                background: isSelected ? "#0f766e" : "#ffffff",
+                color: isSelected ? "#ffffff" : "#475569",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                boxShadow: isSelected ? "0 2px 6px rgba(15,118,110,0.2)" : "0 1px 2px rgba(0,0,0,0.02)",
+                transition: "all 0.15s ease"
+              }}
+            >
+              <span>{getCategoryIcon(cat)} {cat}</span>
+              <span
+                style={{
+                  padding: "1px 6px",
+                  borderRadius: "10px",
+                  fontSize: "11px",
+                  background: isSelected ? "rgba(255,255,255,0.25)" : "#f1f5f9",
+                  color: isSelected ? "#ffffff" : "#64748b"
+                }}
+              >
+                {catCount}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       {displayedAssets.length === 0 ? (
         <Empty title="ไม่พบรายการในระบบ" detail="ลองเปลี่ยนคำค้นหา ตัวกรองประเภท หรือกดเพิ่มรายการใหม่" />
       ) : viewMode === "table" ? (
-        /* Responsive Asset Table View */
-        <div style={{ background: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+        /* 3. Responsive Asset Table View */
+        <div style={{ background: "#ffffff", borderRadius: "12px", border: "1px solid #e2e8f0", overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "13px" }}>
               <thead>
-                <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0", color: "#475569", fontWeight: 600 }}>
+                <tr style={{ background: "#f8fafc", borderBottom: "1px solid #e2e8f0", color: "#334155", fontWeight: 700, fontSize: "12px", letterSpacing: "0.3px" }}>
                   <th style={{ padding: "12px 14px", width: "50px", textAlign: "center" }}>ที่</th>
                   <th style={{ padding: "12px 14px", width: "160px" }}>รหัสครุภัณฑ์</th>
                   <th style={{ padding: "12px 14px" }}>รายการครุภัณฑ์ / ยี่ห้อ / ลักษณะ</th>
-                  <th style={{ padding: "12px 14px", width: "140px" }}>หมวดหมู่</th>
-                  <th style={{ padding: "12px 14px", width: "200px" }}>จุดที่ตั้ง / ห้อง</th>
+                  <th style={{ padding: "12px 14px", width: "130px" }}>หมวดหมู่</th>
+                  <th style={{ padding: "12px 14px", width: "180px" }}>จุดที่ตั้ง / ห้อง</th>
                   <th style={{ padding: "12px 14px", width: "100px", textAlign: "center" }}>สถานะ</th>
-                  <th style={{ padding: "12px 14px", width: "140px", textAlign: "right" }}>การจัดการ</th>
+                  <th style={{ padding: "12px 14px", width: "130px", textAlign: "right" }}>การจัดการ</th>
                 </tr>
               </thead>
               <tbody>
                 {displayedAssets.map((asset, idx) => (
                   <tr
                     key={asset.id}
-                    style={{ borderBottom: "1px solid #f1f5f9", cursor: "pointer" }}
+                    style={{ borderBottom: "1px solid #f1f5f9", cursor: "pointer", transition: "background-color 0.15s ease" }}
                     className="table-row-hover"
                     onClick={() => setActiveAsset(asset)}
                   >
-                    <td style={{ padding: "10px 14px", textAlign: "center", color: "#64748b", fontWeight: 600 }}>
+                    <td style={{ padding: "12px 14px", textAlign: "center", color: "#94a3b8", fontWeight: 600, fontSize: "12px" }}>
                       {idx + 1}
                     </td>
-                    <td style={{ padding: "10px 14px", fontFamily: "monospace", fontWeight: 600, color: "#0f766e" }}>
+                    <td style={{ padding: "12px 14px", fontFamily: "ui-monospace, monospace", fontWeight: 600, color: "#0f766e", fontSize: "12px" }}>
                       {asset.assetCode}
                     </td>
-                    <td style={{ padding: "10px 14px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "18px" }}>{getCategoryIcon(asset.category)}</span>
+                    <td style={{ padding: "12px 14px" }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                        <span style={{ fontSize: "20px", lineHeight: "1.2", flexShrink: 0, marginTop: "2px" }}>{getCategoryIcon(asset.category)}</span>
                         <div>
-                          <strong style={{ color: "#0f172a", display: "block" }}>{asset.name}</strong>
+                          <strong style={{ color: "#0f172a", display: "block", fontSize: "13px", lineHeight: "1.4" }}>{asset.name}</strong>
                           {asset.description && (
-                            <span style={{ fontSize: "11px", color: "#64748b" }}>{asset.description}</span>
+                            <span style={{ fontSize: "11px", color: "#64748b", display: "block", marginTop: "2px" }}>
+                              {asset.description}
+                            </span>
                           )}
                         </div>
                       </div>
                     </td>
-                    <td style={{ padding: "10px 14px", color: "#334155" }}>
-                      <span style={{ background: "#f1f5f9", padding: "2px 8px", borderRadius: "12px", fontSize: "12px" }}>
+                    <td style={{ padding: "12px 14px", color: "#334155" }}>
+                      <span style={{ background: "#f1f5f9", color: "#475569", padding: "3px 8px", borderRadius: "8px", fontSize: "11px", fontWeight: 600, border: "1px solid #e2e8f0" }}>
                         {asset.category || "ครุภัณฑ์ทั่วไป"}
                       </span>
                     </td>
-                    <td style={{ padding: "10px 14px", color: "#475569", fontSize: "12px" }}>
-                      {asset.location || "สำนักงานจังหวัด"}
+                    <td style={{ padding: "12px 14px", color: "#475569", fontSize: "12px" }}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                        <span style={{ color: "#94a3b8", fontSize: "11px" }}>📍</span>
+                        <span>{asset.location || "ส่วนกลาง"}</span>
+                      </span>
                     </td>
-                    <td style={{ padding: "10px 14px", textAlign: "center" }}>
+                    <td style={{ padding: "12px 14px", textAlign: "center" }}>
                       {badge(asset.status, asset.statusColor)}
                     </td>
-                    <td style={{ padding: "10px 14px", textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
+                    <td style={{ padding: "12px 14px", textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
                       <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end" }}>
                         <button
                           type="button"
                           className="button ghost"
-                          style={{ fontSize: "11px", padding: "4px 8px" }}
+                          style={{ fontSize: "11px", padding: "4px 8px", borderRadius: "6px", borderColor: "#cbd5e1" }}
                           onClick={() => setActiveAsset(asset)}
                         >
-                          ดูข้อมูล
+                          👁️ ดู
                         </button>
                         {canManage && (
                           <button
                             type="button"
                             className="button ghost"
-                            style={{ fontSize: "11px", padding: "4px 8px" }}
+                            style={{ fontSize: "11px", padding: "4px 8px", borderRadius: "6px", borderColor: "#cbd5e1" }}
                             onClick={() => setEditingAsset(asset)}
                           >
-                            แก้ไข
+                            ✏️ แก้ไข
                           </button>
                         )}
                       </div>
@@ -922,11 +1033,13 @@ function VisualCatalog({
           </div>
         </div>
       ) : (
-        /* Catalog Image Cards Grid */
-        <div className="catalog-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "16px" }}>
+        /* 4. Catalog Image Cards Grid */
+        <div className="catalog-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "16px" }}>
           {displayedAssets.map((asset) => {
             const hasImg = Boolean(asset.imageUrl);
             const img = asset.imageUrl || fallbackImg;
+            const priceNum = Number(asset.purchasePrice || 0);
+
             return (
               <div
                 key={asset.id}
@@ -934,50 +1047,69 @@ function VisualCatalog({
                 onClick={() => setActiveAsset(asset)}
                 style={{
                   background: "#ffffff",
-                  borderRadius: "12px",
+                  borderRadius: "14px",
                   border: "1px solid #e2e8f0",
                   overflow: "hidden",
                   cursor: "pointer",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
-                  transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03)",
+                  transition: "all 0.2s ease",
+                  display: "flex",
+                  flexDirection: "column"
                 }}
               >
+                {/* Image / Placeholder Area */}
                 <div
                   className="catalog-card-media"
                   style={{
                     width: "100%",
-                    height: "160px",
+                    height: "150px",
                     overflow: "hidden",
-                    background: hasImg ? "#f1f5f9" : "linear-gradient(135deg, #f0fdfa 0%, #e2e8f0 100%)",
+                    background: hasImg ? "#0f172a" : "linear-gradient(145deg, #f8fafc 0%, #e2e8f0 100%)",
                     position: "relative",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    borderBottom: "1px solid #e2e8f0"
                   }}
                 >
                   {hasImg ? (
                     <img src={img} alt={asset.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   ) : (
-                    <div style={{ textAlign: "center" }}>
-                      <span style={{ fontSize: "48px", display: "block" }}>{getCategoryIcon(asset.category)}</span>
+                    <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+                      <div style={{ width: "54px", height: "54px", borderRadius: "14px", background: "#ffffff", display: "grid", placeItems: "center", fontSize: "28px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", border: "1px solid #e2e8f0" }}>
+                        {getCategoryIcon(asset.category)}
+                      </div>
                       <span style={{ fontSize: "11px", color: "#64748b", fontWeight: 600 }}>{asset.category || "ครุภัณฑ์"}</span>
                     </div>
                   )}
                 </div>
-                <div className="catalog-card-info" style={{ padding: "12px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                    <span style={{ fontSize: "11px", color: "#0f766e", fontWeight: 700 }}>
-                      {asset.category || "ไม่ระบุหมวดหมู่"}
+
+                {/* Info Area */}
+                <div className="catalog-card-info" style={{ padding: "14px", display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", gap: "6px" }}>
+                    <span style={{ fontSize: "11px", color: "#0f766e", fontWeight: 700, background: "#f0fdfa", padding: "2px 8px", borderRadius: "6px", border: "1px solid #ccfbf1" }}>
+                      {asset.category || "ทั่วไป"}
                     </span>
                     {badge(asset.status, asset.statusColor)}
                   </div>
-                  <h4 style={{ margin: "0 0 4px 0", fontSize: "14px", fontWeight: 700, color: "#0f172a" }}>{asset.name}</h4>
-                  <div style={{ fontSize: "12px", color: "#64748b", fontFamily: "monospace", marginBottom: "6px" }}>
+
+                  <h4 style={{ margin: "0 0 6px 0", fontSize: "13px", fontWeight: 700, color: "#0f172a", lineHeight: "1.4", minHeight: "36px", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                    {asset.name}
+                  </h4>
+
+                  <div style={{ fontSize: "11px", color: "#64748b", fontFamily: "ui-monospace, monospace", marginBottom: "10px" }}>
                     รหัส: {asset.assetCode}
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "#475569", borderTop: "1px solid #f1f5f9", paddingTop: "8px", marginTop: "4px" }}>
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "140px" }}>{asset.location || "ส่วนกลาง"}</span>
-                    <strong style={{ color: "#0f766e" }}>{money(asset.purchasePrice)}</strong>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "12px", color: "#475569", borderTop: "1px solid #f1f5f9", paddingTop: "10px", marginTop: "auto" }}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "130px", fontSize: "11px", color: "#64748b", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                      <span>📍</span> <span>{asset.location || "ส่วนกลาง"}</span>
+                    </span>
+                    {priceNum > 0 ? (
+                      <strong style={{ color: "#0f766e", fontSize: "12px" }}>{money(priceNum)}</strong>
+                    ) : (
+                      <span style={{ color: "#cbd5e1", fontSize: "12px" }}>—</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1095,12 +1227,11 @@ function VisualCatalog({
                       defaultValue={editingAsset.status || "available"}
                       style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px", background: "#ffffff" }}
                     >
-                      <option value="available">🟢 พร้อมใช้งาน (Available)</option>
-                      <option value="damaged">🔴 ชำรุด (Damaged)</option>
-                      <option value="maintenance">🟠 อยู่ระหว่างซ่อม (Maintenance)</option>
-                      <option value="assigned">🔵 มีผู้รับผิดชอบ (Assigned)</option>
-                      <option value="borrowed">🟣 ถูกยืมใช้งาน (Borrowed)</option>
-                      <option value="disposed">⚫ จำหน่ายแล้ว (Disposed)</option>
+                      {(data.meta.statuses || []).map((s: any) => (
+                        <option key={s.code || s.id} value={s.code || "available"}>
+                          {s.code === "available" ? "🟢" : s.code === "damaged" ? "🔴" : s.code === "maintenance" ? "🟠" : s.code === "assigned" ? "🔵" : s.code === "borrowed" ? "🟣" : s.code === "disposed" ? "⚫" : "⚪"} {s.name || s.code}
+                        </option>
+                      ))}
                     </select>
                   </label>
 
@@ -1138,7 +1269,7 @@ function VisualCatalog({
                   </label>
 
                   <Field label="ปีงบประมาณ" name="budgetYear">
-                    <input name="budgetYear" defaultValue="2568" placeholder="2568" />
+                    <input name="budgetYear" defaultValue={editingAsset.budgetYear || ""} placeholder="2568" />
                   </Field>
                 </div>
 
@@ -1165,8 +1296,8 @@ function VisualCatalog({
                 </label>
               </div>
               <div className="modal-foot">
-                <button type="button" className="button ghost" onClick={() => setEditingAsset(null)}>ยกเลิก</button>
-                <button type="submit" className="button primary">บันทึกการแก้ไข</button>
+                <button type="button" className="button ghost" onClick={() => setEditingAsset(null)} disabled={savingEdit}>ยกเลิก</button>
+                <button type="submit" className="button primary" disabled={savingEdit}>{savingEdit ? "กำลังบันทึก..." : "บันทึกการแก้ไข"}</button>
               </div>
             </form>
           </div>
@@ -1187,7 +1318,7 @@ function VisualCatalog({
             </div>
             <div className="modal-body">
               <p style={{ margin: 0, fontSize: "14px", color: "#475569" }}>
-                การลบรายการครุภัณฑ์นี้จะไม่สามารถย้อนกลับได้ คุณแน่ใจหรือไม่ที่จะลบรายการออกขากระบบ?
+                การลบรายการครุภัณฑ์นี้จะไม่สามารถย้อนกลับได้ คุณแน่ใจหรือไม่ที่จะลบรายการออกจากระบบ?
               </p>
             </div>
             <div className="modal-foot">
@@ -1358,7 +1489,7 @@ export function AppShell({ section, selectedId }: { section: string; selectedId?
 
   const locationDetails = useMemo(() => {
     const map: Record<string, { rooms?: string; department?: string }> = {};
-    const defaultDept = String(data?.meta?.departments?.[0]?.name || data?.actor?.departmentName || "สำนักงานจังหวัดปทุมธานี");
+    const defaultDept = String(data?.meta?.departments?.[0]?.name || data?.actor?.departmentName || "");
     (data?.meta?.locations || []).forEach((loc: any) => {
       const locKey = loc.room || loc.building;
       if (locKey) {
@@ -1372,7 +1503,7 @@ export function AppShell({ section, selectedId }: { section: string; selectedId?
   }, [data, customLocations]);
 
   const allLocationsList = useMemo(() => {
-    if (!data) return ["สำนักงานจังหวัดปทุมธานี"];
+    if (!data) return [];
     const set = new Set<string>();
     data.assets.forEach((a) => {
       if (a.location) set.add(a.location);
@@ -1381,7 +1512,6 @@ export function AppShell({ section, selectedId }: { section: string; selectedId?
       if (l.room) set.add(l.room);
     });
     customLocations.forEach((c) => set.add(c.name));
-    if (set.size === 0) set.add("สำนักงานจังหวัดปทุมธานี");
     return Array.from(set).filter((name) => !deletedLocationNames.includes(name));
   }, [data, customLocations, deletedLocationNames]);
 
@@ -1391,11 +1521,11 @@ export function AppShell({ section, selectedId }: { section: string; selectedId?
       const response = await fetch("/api/bootstrap", { cache: "no-store" });
       const payload = await response.json();
       if (response.status === 401) {
-        router.replace(`/login?returnTo=${encodeURIComponent(pathname || "/")}`);
+        window.location.href = `/login?returnTo=${encodeURIComponent(window.location.pathname || "/")}`;
         return;
       }
       if (response.status === 403 && payload.code === "PASSWORD_CHANGE_REQUIRED") {
-        router.replace(`/change-password?returnTo=${encodeURIComponent(pathname || "/")}`);
+        window.location.href = `/change-password?returnTo=${encodeURIComponent(window.location.pathname || "/")}`;
         return;
       }
       if (!response.ok) throw new Error(payload.error || "โหลดข้อมูลไม่สำเร็จ");
@@ -1406,9 +1536,11 @@ export function AppShell({ section, selectedId }: { section: string; selectedId?
     } finally {
       setLoading(false);
     }
-  }, [pathname, router]);
+  }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
   useEffect(() => { setMobileNav(false); }, [pathname]);
   useEffect(() => {
     if (!toast) return;
@@ -1525,10 +1657,32 @@ export function AppShell({ section, selectedId }: { section: string; selectedId?
   return (
     <div className="app-frame">
       <aside className={`sidebar ${mobileNav ? "is-open" : ""}`}>
-        <div className="brand"><div className="brand-symbol">AF</div><div><strong>AssetFlow</strong><span>ระบบบริหารครุภัณฑ์</span></div></div>
-        <nav className="nav-scroll" aria-label="เมนูหลัก">
+        <div className="brand" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "0 18px", height: "72px" }}>
+          <div
+            className="brand-symbol"
+            style={{
+              background: "linear-gradient(135deg, #0d9488 0%, #0284c7 100%)",
+              color: "#ffffff",
+              boxShadow: "0 4px 12px rgba(13,148,136,0.35)",
+              borderRadius: "10px",
+              width: "38px",
+              height: "38px",
+              fontSize: "15px"
+            }}
+          >
+            AF
+          </div>
+          <div>
+            <strong style={{ color: "#ffffff", fontSize: "16px", letterSpacing: "-0.3px" }}>AssetFlow</strong>
+            <span style={{ color: "#94a3b8", fontSize: "11px" }}>ระบบบริหารจัดการครุภัณฑ์</span>
+          </div>
+        </div>
+
+        <nav className="nav-scroll" aria-label="เมนูหลัก" style={{ padding: "16px 10px 100px" }}>
           <div className="nav-group">
-            <p>ทะเบียนสถานที่และพัสดุ</p>
+            <p style={{ color: "#64748b", fontSize: "10px", fontWeight: 700, letterSpacing: "1px", paddingLeft: "8px", marginBottom: "6px" }}>
+              เมนูภาพรวม
+            </p>
             <button
               className={`nav-item-btn ${(section === "dashboard" || section === "assets") && currentView === "directory" ? "active" : ""}`}
               onClick={() => {
@@ -1536,14 +1690,19 @@ export function AppShell({ section, selectedId }: { section: string; selectedId?
                 setCurrentView("directory");
                 setSelectedLocation("all");
               }}
+              style={{ padding: "8px 10px", borderRadius: "8px", fontSize: "12.5px" }}
             >
-              <span className="nav-icon">LOC</span>
-              <span>ทะเบียนสถานที่จัดเก็บ</span>
+              <span className="nav-icon" style={{ fontSize: "12px" }}>📍</span>
+              <span style={{ fontWeight: 600 }}>ทะเบียนสถานที่จัดเก็บ</span>
             </button>
           </div>
 
-          <div className="nav-group" style={{ marginTop: "20px" }}>
-            <p>สถานที่จัดเก็บหลัก</p>
+          <div className="nav-group" style={{ marginTop: "18px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 8px", marginBottom: "6px" }}>
+              <p style={{ color: "#64748b", fontSize: "10px", fontWeight: 700, letterSpacing: "1px", margin: 0 }}>
+                สถานที่จัดเก็บ ({allLocationsList.length})
+              </p>
+            </div>
             {allLocationsList.map((locName) => {
               const active = (section === "dashboard" || section === "assets") && currentView === "catalog" && selectedLocation === locName;
               const count = data.assets.filter((a) => isAssetInLocation(a, locName)).length;
@@ -1556,12 +1715,35 @@ export function AppShell({ section, selectedId }: { section: string; selectedId?
                     setSelectedLocation(locName);
                     setCurrentView("catalog");
                   }}
-                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", textAlign: "left" }}
+                  title={locName}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "7px 10px",
+                    borderRadius: "8px",
+                    fontSize: "12px",
+                    marginBottom: "2px"
+                  }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", overflow: "hidden" }}>
-                    <span className="nav-label-truncate" title={locName}>{locName}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", overflow: "hidden", flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: "13px", flexShrink: 0 }}>{getRoomIcon(locName)}</span>
+                    <span className="nav-label-truncate">{locName}</span>
                   </div>
-                  <b className="count-badge" style={{ background: "#0f766e", color: "#ffffff", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: "bold" }}>
+                  <b
+                    className="count-badge"
+                    style={{
+                      background: active ? "#14b8a6" : "rgba(255,255,255,0.08)",
+                      color: active ? "#042f2e" : "#94a3b8",
+                      padding: "2px 7px",
+                      borderRadius: "10px",
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      flexShrink: 0
+                    }}
+                  >
                     {count}
                   </b>
                 </button>
@@ -1570,24 +1752,67 @@ export function AppShell({ section, selectedId }: { section: string; selectedId?
           </div>
 
           {data.actor?.roleCode === "admin" && (
-            <div className="nav-group" style={{ marginTop: "24px" }}>
-              <p>ระบบการจัดการ (ADMIN)</p>
+            <div className="nav-group" style={{ marginTop: "20px" }}>
+              <p style={{ color: "#64748b", fontSize: "10px", fontWeight: 700, letterSpacing: "1px", paddingLeft: "8px", marginBottom: "6px" }}>
+                การจัดการระบบ
+              </p>
               <button
                 className={`nav-item-btn ${section === "users" ? "active" : ""}`}
                 onClick={() => {
                   router.replace("/users");
                 }}
+                style={{ padding: "8px 10px", borderRadius: "8px", fontSize: "12.5px" }}
               >
-                <span className="nav-icon">USR</span>
-                <span>ผู้ใช้และสิทธิ์</span>
+                <span className="nav-icon" style={{ fontSize: "12px" }}>⚙️</span>
+                <span style={{ fontWeight: 600 }}>ผู้ใช้และสิทธิ์</span>
               </button>
             </div>
           )}
         </nav>
-        <div className="sidebar-user">
-          <div className="avatar">{data.actor?.fullName?.slice(0, 1) || "A"}</div>
-          <div><strong>{data.actor?.fullName || "ผู้ใช้งาน"}</strong><span>{data.actor?.roleName || "ไม่ระบุบทบาท"}</span></div>
-          <button className="logout-button" onClick={logout} disabled={busy} aria-label="ออกจากระบบ" title="ออกจากระบบ">↪</button>
+
+        <div className="sidebar-user" style={{ height: "68px", padding: "10px 14px", borderTop: "1px solid rgba(255,255,255,0.08)", background: "#0a192f" }}>
+          <div
+            className="avatar"
+            style={{
+              width: "34px",
+              height: "34px",
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #0d9488 0%, #0369a1 100%)",
+              color: "#ffffff",
+              fontWeight: 700,
+              fontSize: "13px"
+            }}
+          >
+            {data.actor?.fullName?.slice(0, 1) || "A"}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+              <strong style={{ color: "#ffffff", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {data.actor?.fullName || "Admin"}
+              </strong>
+              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0 }} title="Online" />
+            </div>
+            <span style={{ color: "#64748b", fontSize: "10.5px", display: "block" }}>{data.actor?.roleName || "ผู้ดูแลระบบ"}</span>
+          </div>
+          <button
+            className="logout-button"
+            onClick={logout}
+            disabled={busy}
+            aria-label="ออกจากระบบ"
+            title="ออกจากระบบ"
+            style={{
+              padding: "6px",
+              borderRadius: "6px",
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              color: "#94a3b8",
+              cursor: "pointer",
+              fontSize: "13px",
+              transition: "all 0.15s ease"
+            }}
+          >
+            🚪
+          </button>
         </div>
       </aside>
 
@@ -2408,17 +2633,35 @@ function Field({ label, name, type = "text", required = false, placeholder, defa
 
 function AssetForm({ data }: { data: BootstrapData }) {
   const [imagePreview, setImagePreview] = useState<string>("");
+  const [uploading, setUploading] = useState(false);
 
-  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
+  async function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setImagePreview(String(event.target.result));
-        }
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    // Show local preview immediately
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) setImagePreview(String(event.target.result));
+    };
+    reader.readAsDataURL(file);
+
+    // Upload to server via /api/files
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("relatedType", "asset");
+      formData.append("title", file.name);
+      const res = await fetch("/api/files", { method: "POST", body: formData });
+      const result = await res.json();
+      if (res.ok && result.document?.objectKey) {
+        setImagePreview(result.document.objectKey);
+      }
+    } catch {
+      // Keep local preview as fallback
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -2440,6 +2683,22 @@ function AssetForm({ data }: { data: BootstrapData }) {
       </Field>
 
       <Field label="ราคา / มูลค่าจัดซื้อ (บาท)" name="purchasePrice" type="number" placeholder="เช่น 137000" />
+
+      {/* Status selection */}
+      <label className="form-field">
+        <span>สถานะการใช้งาน</span>
+        <select
+          name="status"
+          defaultValue="available"
+          style={{ padding: "8px 12px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px", background: "#ffffff" }}
+        >
+          {(data.meta.statuses || []).map((s: any) => (
+            <option key={s.code || s.id} value={s.code || "available"}>
+              {s.code === "available" ? "🟢" : s.code === "damaged" ? "🔴" : s.code === "maintenance" ? "🟠" : s.code === "assigned" ? "🔵" : s.code === "borrowed" ? "🟣" : s.code === "disposed" ? "⚫" : "⚪"} {s.name || s.code}
+            </option>
+          ))}
+        </select>
+      </label>
       
       {/* Clean inputs for Building & Room without prefilled values */}
       <Field label="สถานที่จัดเก็บหลัก / อาคาร" name="building" placeholder="เช่น จวนผู้ว่าราชการจังหวัด, ศาลากลางจังหวัด" />
@@ -2460,10 +2719,10 @@ function AssetForm({ data }: { data: BootstrapData }) {
           )}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
             <div>
-              <span style={{ fontSize: "12px", color: "#475569", display: "block", marginBottom: "2px" }}>เลือกไฟล์รูปภาพจากเครื่อง:</span>
-              <input type="file" accept="image/*" onChange={handleFileChange} style={{ fontSize: "13px", width: "100%" }} />
+              <span style={{ fontSize: "12px", color: "#475569", display: "block", marginBottom: "2px" }}>เลือกไฟล์รูปภาพจากเครื่อง:{uploading ? " กำลังอัปโหลด..." : ""}</span>
+              <input type="file" accept="image/*" onChange={handleFileChange} disabled={uploading} style={{ fontSize: "13px", width: "100%" }} />
             </div>
-            <input type="hidden" name="imageUrl" value={imagePreview} />
+            <input type="hidden" name="imageUrl" value={imagePreview.startsWith("data:") ? "" : imagePreview} />
             <div>
               <span style={{ fontSize: "12px", color: "#475569", display: "block", marginBottom: "2px" }}>หรือวาง URL รูปภาพถ่าย:</span>
               <input

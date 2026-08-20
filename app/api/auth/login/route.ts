@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
     const response = Response.json({
       user: { id: account.id, username: account.username, fullName: account.fullName, roleCode: account.roleCode, roleName: account.roleName },
-      mustChangePassword: false,
+      mustChangePassword: !!account.mustChangePassword,
     });
     response.headers.set("Set-Cookie", `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=43200${secure}`);
     response.headers.set("Cache-Control", "no-store");

@@ -104,12 +104,16 @@ export async function ensureTablesExist() {
 }
 
 export async function seedDatabaseIfEmpty() {
+  if (seeded) return;
   await ensureTablesExist();
   const db = getDb();
   await purgeOldMockups();
-  if (seeded) return;
   const existing = await db.select({ id: roles.id }).from(roles).limit(1);
   const existingAssets = await db.select({ id: assets.id }).from(assets).limit(1);
+  if (existing.length && existingAssets.length) {
+    seeded = true;
+    return;
+  }
   if (existing.length && !existingAssets.length) {
     try {
       await db.delete(assetImages);

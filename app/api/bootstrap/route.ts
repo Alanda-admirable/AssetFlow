@@ -27,69 +27,88 @@ export async function GET(request: Request) {
     if (!actor) return Response.json({ error: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
 
     const isAdmin = actor.roleCode === "admin";
-    const isOfficer = actor.roleCode === "asset_officer";
 
-    const assetRows = await db
-      .select({
-        id: assets.id,
-        assetCode: assets.assetCode,
-        serialNumber: assets.serialNumber,
-        name: assets.name,
-        status: assetStatuses.code,
-        statusName: assetStatuses.name,
-        statusColor: assetStatuses.color,
-        category: assetCategories.name,
-        manufacturer: manufacturers.name,
-        model: assetModels.name,
-        location: locations.room,
-        building: locations.building,
-        department: departments.name,
-        assignedTo: users.fullName,
-        purchasePrice: assets.purchasePrice,
-        purchaseDate: assets.purchaseDate,
-        warrantyEnd: assets.warrantyEnd,
-        description: assets.description,
-        qrToken: assets.qrToken,
-        updatedAt: assets.updatedAt,
-      })
-      .from(assets)
-      .leftJoin(assetStatuses, eq(assets.statusId, assetStatuses.id))
-      .leftJoin(assetCategories, eq(assets.categoryId, assetCategories.id))
-      .leftJoin(assetModels, eq(assets.modelId, assetModels.id))
-      .leftJoin(manufacturers, eq(assetModels.manufacturerId, manufacturers.id))
-      .leftJoin(locations, eq(assets.locationId, locations.id))
-      .leftJoin(departments, eq(assets.departmentId, departments.id))
-      .leftJoin(users, eq(assets.assignedUserId, users.id))
-      .orderBy(desc(assets.updatedAt));
-
-    const notificationRows = await db.select().from(notifications).orderBy(desc(notifications.createdAt)).limit(10);
-
-    const userRows = await db
-      .select({
-        id: users.id,
-        employeeCode: users.employeeCode,
-        username: users.username,
-        email: users.email,
-        fullName: users.fullName,
-        phone: users.phone,
-        status: users.status,
-        roleId: users.roleId,
-        role: roles.name,
-        roleCode: roles.code,
-        departmentId: users.departmentId,
-        department: departments.name,
-        lastLoginAt: users.lastLoginAt,
-      })
-      .from(users)
-      .leftJoin(roles, eq(users.roleId, roles.id))
-      .leftJoin(departments, eq(users.departmentId, departments.id));
-
-    const [categoryRows, statusRows, locationRows, departmentRows, modelRows, imageRows, roleRows] = await Promise.all([
+    // Run all database queries in parallel for maximum performance
+    const [
+      assetRows,
+      notificationRows,
+      userRows,
+      categoryRows,
+      statusRows,
+      locationRows,
+      departmentRows,
+      modelRows,
+      imageRows,
+      roleRows,
+    ] = await Promise.all([
+      db
+        .select({
+          id: assets.id,
+          assetCode: assets.assetCode,
+          serialNumber: assets.serialNumber,
+          name: assets.name,
+          status: assetStatuses.code,
+          statusName: assetStatuses.name,
+          statusColor: assetStatuses.color,
+          category: assetCategories.name,
+          manufacturer: manufacturers.name,
+          model: assetModels.name,
+          location: locations.room,
+          building: locations.building,
+          department: departments.name,
+          assignedTo: users.fullName,
+          purchasePrice: assets.purchasePrice,
+          purchaseDate: assets.purchaseDate,
+          warrantyEnd: assets.warrantyEnd,
+          description: assets.description,
+          qrToken: assets.qrToken,
+          updatedAt: assets.updatedAt,
+        })
+        .from(assets)
+        .leftJoin(assetStatuses, eq(assets.statusId, assetStatuses.id))
+        .leftJoin(assetCategories, eq(assets.categoryId, assetCategories.id))
+        .leftJoin(assetModels, eq(assets.modelId, assetModels.id))
+        .leftJoin(manufacturers, eq(assetModels.manufacturerId, manufacturers.id))
+        .leftJoin(locations, eq(assets.locationId, locations.id))
+        .leftJoin(departments, eq(assets.departmentId, departments.id))
+        .leftJoin(users, eq(assets.assignedUserId, users.id))
+        .orderBy(desc(assets.updatedAt)),
+      db.select().from(notifications).orderBy(desc(notifications.createdAt)).limit(10),
+      isAdmin
+        ? db
+            .select({
+              id: users.id,
+              employeeCode: users.employeeCode,
+              username: users.username,
+              email: users.email,
+              fullName: users.fullName,
+              phone: users.phone,
+              status: users.status,
+              roleId: users.roleId,
+              role: roles.name,
+              roleCode: roles.code,
+              departmentId: users.departmentId,
+              department: departments.name,
+              lastLoginAt: users.lastLoginAt,
+            })
+            .from(users)
+            .leftJoin(roles, eq(users.roleId, roles.id))
+            .leftJoin(departments, eq(users.departmentId, departments.id))
+        : Promise.resolve([]),
       db.select().from(assetCategories),
       db.select().from(assetStatuses).orderBy(assetStatuses.sortOrder),
       db.select().from(locations),
       db.select().from(departments),
-      db.select({ id: assetModels.id, name: assetModels.name, manufacturer: manufacturers.name, categoryId: assetModels.categoryId, modelNumber: assetModels.modelNumber }).from(assetModels).leftJoin(manufacturers, eq(assetModels.manufacturerId, manufacturers.id)),
+      db
+        .select({
+          id: assetModels.id,
+          name: assetModels.name,
+          manufacturer: manufacturers.name,
+          categoryId: assetModels.categoryId,
+          modelNumber: assetModels.modelNumber,
+        })
+        .from(assetModels)
+        .leftJoin(manufacturers, eq(assetModels.manufacturerId, manufacturers.id)),
       db.select().from(assetImages),
       db.select().from(roles),
     ]);
@@ -109,7 +128,7 @@ export async function GET(request: Request) {
       totalAssets: visibleAssets.length,
       available: visibleAssets.filter((item) => item.status === "available").length,
       inUse: visibleAssets.filter((item) => ["assigned", "borrowed"].includes(item.status || "")).length,
-      maintenance: 0,
+      maintenance: visibleAssets.filter((item) => item.status === "maintenance").length,
       pendingApprovals: 0,
       overdue: 0,
       totalValue,
@@ -122,16 +141,7 @@ export async function GET(request: Request) {
       actor: publicActor,
       stats,
       assets: visibleAssets,
-      requests: [],
-      maintenance: [],
-      audits: [],
-      contracts: [],
-      disposals: [],
       notifications: notificationRows,
-      documents: [],
-      customFields: [],
-      settings: [],
-      activities: [],
       users: isAdmin ? userRows : [],
       meta: { categories: categoryRows, statuses: statusRows, locations: locationRows, departments: departmentRows, models: modelRows, roles: roleRows },
     });
