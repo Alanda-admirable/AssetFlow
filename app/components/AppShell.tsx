@@ -1562,7 +1562,7 @@ export function AppShell({ section, selectedId }: { section: string; selectedId?
                     <span className="nav-label-truncate" title={locName}>{locName}</span>
                   </div>
                   <b className="count-badge" style={{ background: "#0f766e", color: "#ffffff", padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: "bold" }}>
-                    {count || data.assets.length}
+                    {count}
                   </b>
                 </button>
               );
